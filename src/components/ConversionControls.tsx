@@ -1,4 +1,6 @@
-import type { ConversionSettings } from '../types'
+import { useState } from 'react'
+import type { ConversionSettings, PreviewEstimate } from '../types'
+import serviceLimits from '../serviceLimits.json'
 
 interface ConversionControlsProps {
   settings: ConversionSettings
@@ -6,11 +8,14 @@ interface ConversionControlsProps {
   onConvert: () => void
   onReset: () => void
   onDownload: () => void
+  onCancel: () => void
   converting: boolean
   progress: number
   hasResult: boolean
   isVideo: boolean
   mediaDuration: number | null
+  previewEstimate: PreviewEstimate
+  hasFile: boolean
 }
 
 export function ConversionControls({
@@ -19,24 +24,45 @@ export function ConversionControls({
   onConvert,
   onReset,
   onDownload,
+  onCancel,
   converting,
-  progress,
   hasResult,
   isVideo,
   mediaDuration,
+  previewEstimate,
+  hasFile,
 }: ConversionControlsProps) {
+  const [showServiceLimits, setShowServiceLimits] = useState(false)
+
+  const formatSize = (bytes: number) => {
+    if (bytes === 0) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+  }
+
+  const checkServiceCompatibility = (estimatedSize: number, duration: number) => {
+    return serviceLimits.services.map(service => {
+      const tierResults = service.limits.map(limit => {
+        const sizeOk = estimatedSize <= limit.maxSize
+        const durationOk = !limit.maxDuration || duration <= limit.maxDuration
+        return {
+          ...limit,
+          compatible: sizeOk && durationOk,
+          sizeExceeded: !sizeOk,
+          durationExceeded: !durationOk
+        }
+      })
+      return {
+        ...service,
+        compatible: tierResults.some(t => t.compatible),
+        tierResults
+      }
+    })
+  }
   return (
     <div className="controls">
-      <div className="logo">
-        <svg viewBox="0 0 32 28" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M11 14 L11 8 Q11 6, 11.5 5 Q12 6, 12 8 L12 13"/>
-          <path d="M21 14 L21 8 Q21 6, 20.5 5 Q20 6, 20 8 L20 13"/>
-          <circle cx="16" cy="18" r="7" fill="currentColor" stroke="none"/>
-          <circle cx="13.5" cy="17" r="1" fill="#fff"/>
-          <circle cx="18.5" cy="17" r="1" fill="#fff"/>
-        </svg>
-      </div>
-
       <div className="control-group">
         <label>Format</label>
         <select
@@ -258,10 +284,85 @@ export function ConversionControls({
         </>
       )}
 
+      <div className="control-group" style={{ position: 'relative' }}>
+        <label>Estimated Size</label>
+        <div
+          style={{ color: '#666', fontSize: '0.9em', cursor: previewEstimate.estimatedSize > 0 ? 'pointer' : 'default', minHeight: '1.2em' }}
+          onClick={() => previewEstimate.estimatedSize > 0 && setShowServiceLimits(!showServiceLimits)}
+          title={previewEstimate.estimatedSize > 0 ? "Click to see upload compatibility" : ""}
+        >
+          {previewEstimate.estimatedSize > 0 ? (
+            <>
+              {previewEstimate.isEstimating ? 'Calculating...' : formatSize(previewEstimate.estimatedSize)} ℹ️
+            </>
+          ) : (
+            <span style={{ color: '#ccc' }}>—</span>
+          )}
+        </div>
+        {showServiceLimits && !previewEstimate.isEstimating && previewEstimate.estimatedSize > 0 && (
+            <div className="service-limits-popup">
+              <div className="service-limits-header">
+                <span>Upload Compatibility</span>
+                <button
+                  className="close-popup-btn"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowServiceLimits(false)
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="service-limits-content">
+                {checkServiceCompatibility(
+                  previewEstimate.estimatedSize,
+                  (settings.endTime ?? mediaDuration ?? 0) - (settings.startTime ?? 0)
+                ).map((service) => (
+                  <div key={service.name} className="service-item-container">
+                    <div className="service-item-header">
+                      <strong>{service.name}</strong>
+                    </div>
+                    <div className="service-tiers-list">
+                      {service.tierResults.map((tier, idx) => (
+                        <div key={idx} className={`tier-item ${tier.compatible ? 'tier-ok' : 'tier-fail'}`}>
+                          <div className="tier-info">
+                            <span className="tier-status">{tier.compatible ? '✓' : '✗'}</span>
+                            <span className="tier-name">{tier.tier}</span>
+                          </div>
+                          <div className="tier-limits">
+                            <span className={tier.sizeExceeded ? 'limit-exceeded' : ''}>
+                              {formatSize(tier.maxSize)}
+                            </span>
+                            {tier.maxDuration && (
+                              <>
+                                <span className="limit-separator">•</span>
+                                <span className={tier.durationExceeded ? 'limit-exceeded' : ''}>
+                                  {Math.floor(tier.maxDuration / 60)}m
+                                  {tier.maxDuration % 60 > 0 ? ` ${tier.maxDuration % 60}s` : ''}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+        )}
+      </div>
+
       <div className="action-buttons">
-        <button onClick={onConvert} disabled={converting} className="convert-btn">
-          {converting ? `${progress}%` : 'Convert'}
-        </button>
+        {converting ? (
+          <button onClick={onCancel} className="cancel-btn">
+            Cancel
+          </button>
+        ) : (
+          <button onClick={onConvert} disabled={converting || !hasFile} className="convert-btn">
+            Convert
+          </button>
+        )}
         {hasResult && (
           <button onClick={onDownload} className="download-btn">
             Download

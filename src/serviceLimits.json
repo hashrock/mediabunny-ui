@@ -1,0 +1,182 @@
+{
+  "services": [
+    {
+      "name": "Discord",
+      "icon": "discord",
+      "limits": [
+        {
+          "tier": "Free",
+          "maxSize": 10485760,
+          "maxSizeMB": 10,
+          "notes": "Reduced from 25MB in September 2024"
+        },
+        {
+          "tier": "Nitro Basic",
+          "maxSize": 52428800,
+          "maxSizeMB": 50,
+          "notes": "Paid subscription"
+        },
+        {
+          "tier": "Nitro",
+          "maxSize": 524288000,
+          "maxSizeMB": 500,
+          "notes": "Paid subscription"
+        }
+      ]
+    },
+    {
+      "name": "Slack",
+      "icon": "slack",
+      "limits": [
+        {
+          "tier": "All Users",
+          "maxSize": 1073741824,
+          "maxSizeMB": 1024,
+          "notes": "1GB for regular file uploads"
+        }
+      ]
+    },
+    {
+      "name": "Twitter/X",
+      "icon": "twitter",
+      "limits": [
+        {
+          "tier": "Standard",
+          "maxSize": 536870912,
+          "maxSizeMB": 512,
+          "maxDuration": 140,
+          "notes": "Up to 2 minutes 20 seconds"
+        },
+        {
+          "tier": "Premium",
+          "maxSize": 17179869184,
+          "maxSizeMB": 16384,
+          "maxDuration": 14400,
+          "notes": "Up to 4 hours on web/iOS, 10 minutes on Android"
+        }
+      ]
+    },
+    {
+      "name": "YouTube",
+      "icon": "youtube",
+      "limits": [
+        {
+          "tier": "Unverified",
+          "maxSize": 274877906944,
+          "maxSizeMB": 262144,
+          "maxDuration": 900,
+          "notes": "256GB, but limited to 15 minutes duration"
+        },
+        {
+          "tier": "Verified",
+          "maxSize": 274877906944,
+          "maxSizeMB": 262144,
+          "maxDuration": 43200,
+          "notes": "256GB or 12 hours, whichever is less"
+        }
+      ]
+    },
+    {
+      "name": "WhatsApp",
+      "icon": "whatsapp",
+      "limits": [
+        {
+          "tier": "Media",
+          "maxSize": 16777216,
+          "maxSizeMB": 16,
+          "notes": "Videos shared as media"
+        },
+        {
+          "tier": "Document",
+          "maxSize": 2147483648,
+          "maxSizeMB": 2048,
+          "notes": "Videos shared as documents"
+        }
+      ]
+    },
+    {
+      "name": "Telegram",
+      "icon": "telegram",
+      "limits": [
+        {
+          "tier": "Free",
+          "maxSize": 2147483648,
+          "maxSizeMB": 2048,
+          "notes": "2GB for all users"
+        },
+        {
+          "tier": "Premium",
+          "maxSize": 4294967296,
+          "maxSizeMB": 4096,
+          "notes": "4GB for Premium subscribers"
+        }
+      ]
+    },
+    {
+      "name": "Instagram",
+      "icon": "instagram",
+      "limits": [
+        {
+          "tier": "Stories",
+          "maxSize": 4294967296,
+          "maxSizeMB": 4096,
+          "maxDuration": 15,
+          "notes": "4GB per 15 second segment"
+        },
+        {
+          "tier": "Feed (under 10 min)",
+          "maxSize": 681574400,
+          "maxSizeMB": 650,
+          "maxDuration": 600,
+          "notes": "Recommended to keep under 650MB"
+        },
+        {
+          "tier": "Feed (3s-60min)",
+          "maxSize": 3865470976,
+          "maxSizeMB": 3686,
+          "maxDuration": 3600,
+          "notes": "Maximum 3.6GB"
+        }
+      ]
+    },
+    {
+      "name": "Facebook",
+      "icon": "facebook",
+      "limits": [
+        {
+          "tier": "Feed Videos",
+          "maxSize": 10737418240,
+          "maxSizeMB": 10240,
+          "maxDuration": 14400,
+          "notes": "Up to 10GB, 240 minutes max"
+        },
+        {
+          "tier": "Ads/Stories/Reels",
+          "maxSize": 4294967296,
+          "maxSizeMB": 4096,
+          "notes": "4GB for ads and other content"
+        }
+      ]
+    },
+    {
+      "name": "TikTok",
+      "icon": "tiktok",
+      "limits": [
+        {
+          "tier": "Under 3 minutes",
+          "maxSize": 524288000,
+          "maxSizeMB": 500,
+          "maxDuration": 180,
+          "notes": "Videos under 3 minutes"
+        },
+        {
+          "tier": "3-10 minutes",
+          "maxSize": 2147483648,
+          "maxSizeMB": 2048,
+          "maxDuration": 600,
+          "notes": "Videos between 3-10 minutes"
+        }
+      ]
+    }
+  ]
+}

@@ -38,7 +38,6 @@ export function VideoPreview({
   videoCodec,
   audioCodec,
   metadataTags,
-  onFileSelect,
 }: VideoPreviewProps) {
   const [isDetailExpanded, setIsDetailExpanded] = useState(false)
   const formatBytes = (bytes: number) => {
@@ -82,12 +81,6 @@ export function VideoPreview({
       {file && (
         <>
           <div className="file-info-overlay">
-            <div className="file-info-main">
-              <span className="filename">{file.name}</span>
-              <button className="select-file-btn" onClick={onFileSelect}>
-                Select File
-              </button>
-            </div>
             <div className="file-info-details">
               <span className="file-detail">
                 <span className="detail-label">Size:</span> {formatBytes(file.size)}

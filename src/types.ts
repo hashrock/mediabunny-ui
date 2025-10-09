@@ -13,3 +13,8 @@ export interface ConversionResult {
   convertedSize: number
   filename: string
 }
+
+export interface PreviewEstimate {
+  estimatedSize: number
+  isEstimating: boolean
+}
