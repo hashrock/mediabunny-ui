@@ -10,13 +10,15 @@ import {
   WebMOutputFormat,
   Conversion,
 } from 'mediabunny'
-import type { ConversionSettings, ConversionResult, PreviewEstimate } from './types'
+import type { ConversionSettings, ConversionResult, PreviewEstimate, BatchFileStatus } from './types'
 import { ConversionControls } from './components/ConversionControls'
 import { VideoPreview } from './components/VideoPreview'
 import { FileUpload } from './components/FileUpload'
+import { BatchStatus } from './components/BatchStatus'
 
 function App() {
   const [file, setFile] = useState<File | null>(null)
+  const [batchFiles, setBatchFiles] = useState<BatchFileStatus[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const [settings, setSettings] = useState<ConversionSettings>({
     format: 'mp4',
@@ -36,6 +38,7 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const currentConversionRef = useRef<Conversion | null>(null)
   const previewTimeoutRef = useRef<number | null>(null)
+  const outputDirHandleRef = useRef<FileSystemDirectoryHandle | null>(null)
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -101,17 +104,32 @@ function App() {
     }
   }, [])
 
+  const handleFilesSelect = useCallback((selectedFiles: File[]) => {
+    setBatchFiles(
+      selectedFiles.map(file => ({
+        file,
+        status: 'pending' as const,
+        progress: 0,
+      }))
+    )
+    setFile(null)
+    setResult(null)
+    setError('')
+  }, [])
+
   const handleDrop = useCallback(
     async (e: React.DragEvent) => {
       e.preventDefault()
       setIsDragging(false)
 
-      const droppedFile = e.dataTransfer.files[0]
-      if (droppedFile) {
-        await processFile(droppedFile)
+      const droppedFiles = Array.from(e.dataTransfer.files)
+      if (droppedFiles.length === 1) {
+        await processFile(droppedFiles[0])
+      } else if (droppedFiles.length > 1) {
+        handleFilesSelect(droppedFiles)
       }
     },
-    [processFile]
+    [processFile, handleFilesSelect]
   )
 
   const handleFileSelect = useCallback(
@@ -247,6 +265,157 @@ function App() {
     }
   }
 
+  const handleBatchConvert = async () => {
+    if (batchFiles.length === 0) return
+
+    // Request directory handle using File System Access API
+    try {
+      // Check if the browser supports the File System Access API
+      if (!('showDirectoryPicker' in window)) {
+        setError('File System Access API is not supported in this browser. Please use Chrome or Edge.')
+        return
+      }
+
+      const dirHandle = await (window as any).showDirectoryPicker()
+      outputDirHandleRef.current = dirHandle
+
+      setConverting(true)
+      setError('')
+
+      // Convert each file
+      for (let i = 0; i < batchFiles.length; i++) {
+        const fileStatus = batchFiles[i]
+        
+        // Update status to converting
+        setBatchFiles(prev => {
+          const updated = [...prev]
+          updated[i] = { ...updated[i], status: 'converting', progress: 0 }
+          return updated
+        })
+
+        try {
+          const source = new BlobSource(fileStatus.file)
+          const input = new Input({
+            source,
+            formats: ALL_FORMATS,
+          })
+
+          const target = new BufferTarget()
+          let outputFormat
+
+          switch (settings.format) {
+            case 'mp4':
+              outputFormat = new Mp4OutputFormat()
+              break
+            case 'webm':
+              outputFormat = new WebMOutputFormat()
+              break
+          }
+
+          const output = new Output({
+            target,
+            format: outputFormat,
+          })
+
+          const conversionOptions: any = {
+            input,
+            output,
+            video: {
+              ...(settings.width && { width: settings.width }),
+              ...(settings.height && { height: settings.height }),
+              bitrate: Math.round((settings.quality / 100) * 5_000_000),
+            },
+          }
+
+          const conversion = await Conversion.init(conversionOptions)
+          currentConversionRef.current = conversion
+
+          if (!conversion.isValid) {
+            throw new Error('Conversion is invalid: ' + JSON.stringify(conversion.discardedTracks))
+          }
+
+          conversion.onProgress = (prog) => {
+            const progressPercent = Math.round(prog * 100)
+            setBatchFiles(prev => {
+              const updated = [...prev]
+              updated[i] = { ...updated[i], progress: progressPercent }
+              return updated
+            })
+          }
+
+          await conversion.execute()
+
+          const buffer = target.buffer
+          if (!buffer) {
+            throw new Error('No buffer available after conversion')
+          }
+
+          const convertedSize = buffer.byteLength
+          const originalSize = fileStatus.file.size
+
+          const fileExtension = settings.format
+          const filename = fileStatus.file.name.replace(/\.[^.]+$/, `.${fileExtension}`)
+
+          const conversionResult: ConversionResult = {
+            buffer,
+            originalSize,
+            convertedSize,
+            filename,
+          }
+
+          // Save file using File System Access API
+          try {
+            const fileHandle = await dirHandle.getFileHandle(filename, { create: true })
+            const writable = await fileHandle.createWritable()
+            await writable.write(buffer)
+            await writable.close()
+          } catch (saveError) {
+            console.error('Error saving file:', saveError)
+            throw new Error('Failed to save file to disk')
+          }
+
+          // Update status to completed
+          setBatchFiles(prev => {
+            const updated = [...prev]
+            updated[i] = {
+              ...updated[i],
+              status: 'completed',
+              progress: 100,
+              result: conversionResult,
+            }
+            return updated
+          })
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : 'Conversion failed'
+          console.error('Conversion error for', fileStatus.file.name, ':', err)
+          
+          // Update status to error
+          setBatchFiles(prev => {
+            const updated = [...prev]
+            updated[i] = {
+              ...updated[i],
+              status: 'error',
+              error: errorMessage,
+            }
+            return updated
+          })
+        } finally {
+          currentConversionRef.current = null
+        }
+      }
+
+      setConverting(false)
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') {
+        setError('Folder selection was cancelled')
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to select output folder')
+      }
+      setConverting(false)
+      console.error('Batch conversion error:', err)
+    }
+  }
+
   const runPreviewEncode = useCallback(async (currentSettings: ConversionSettings) => {
     if (!file) return
 
@@ -368,6 +537,7 @@ function App() {
         settings={settings}
         onSettingsChange={setSettings}
         onConvert={handleConvert}
+        onBatchConvert={handleBatchConvert}
         onReset={handleReset}
         onDownload={handleDownload}
         onCancel={handleCancel}
@@ -378,16 +548,21 @@ function App() {
         mediaDuration={mediaDuration}
         previewEstimate={previewEstimate}
         hasFile={!!file}
+        hasBatchFiles={batchFiles.length > 0}
       />
 
       <FileUpload
         file={file}
+        files={batchFiles.map(f => f.file)}
         isDragging={isDragging}
         onFileSelect={handleFileSelect}
+        onFilesSelect={handleFilesSelect}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       />
+
+      {batchFiles.length > 0 && <BatchStatus files={batchFiles} />}
 
       {file && (
         <VideoPreview
