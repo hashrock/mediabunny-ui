@@ -177,6 +177,7 @@ function App() {
         video: {
           ...(settings.width && { width: settings.width }),
           ...(settings.height && { height: settings.height }),
+          ...(settings.width && settings.height && { fit: 'contain' }),
           bitrate: Math.round((settings.quality / 100) * 5_000_000),
         },
       }
@@ -279,6 +280,18 @@ function App() {
       const dirHandle = await (window as any).showDirectoryPicker()
       outputDirHandleRef.current = dirHandle
 
+      // Request write permission upfront
+      try {
+        const permission = await dirHandle.requestPermission({ mode: 'readwrite' })
+        if (permission !== 'granted') {
+          setError('Write permission not granted for the selected folder')
+          return
+        }
+      } catch (permError) {
+        console.warn('Permission request not supported or failed:', permError)
+        // Continue anyway as some browsers may not support requestPermission
+      }
+
       setConverting(true)
       setError('')
 
@@ -323,6 +336,7 @@ function App() {
             video: {
               ...(settings.width && { width: settings.width }),
               ...(settings.height && { height: settings.height }),
+              ...(settings.width && settings.height && { fit: 'contain' }),
               bitrate: Math.round((settings.quality / 100) * 5_000_000),
             },
           }
@@ -405,6 +419,7 @@ function App() {
       }
 
       setConverting(false)
+      setError('') // Clear error message after successful batch conversion
     } catch (err) {
       if ((err as Error).name === 'AbortError') {
         setError('Folder selection was cancelled')
