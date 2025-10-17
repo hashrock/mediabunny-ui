@@ -60,7 +60,7 @@ This application now supports batch conversion of multiple video files using the
 ### File System Access API
 The application uses the modern File System Access API to write files directly to a user-selected directory:
 
-```javascript
+```typescript
 // Request directory access
 const dirHandle = await window.showDirectoryPicker()
 
