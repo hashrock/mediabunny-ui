@@ -6,6 +6,7 @@ interface ConversionControlsProps {
   settings: ConversionSettings
   onSettingsChange: (settings: ConversionSettings) => void
   onConvert: () => void
+  onBatchConvert: () => void
   onReset: () => void
   onDownload: () => void
   onCancel: () => void
@@ -16,12 +17,14 @@ interface ConversionControlsProps {
   mediaDuration: number | null
   previewEstimate: PreviewEstimate
   hasFile: boolean
+  hasBatchFiles: boolean
 }
 
 export function ConversionControls({
   settings,
   onSettingsChange,
   onConvert,
+  onBatchConvert,
   onReset,
   onDownload,
   onCancel,
@@ -31,6 +34,7 @@ export function ConversionControls({
   mediaDuration,
   previewEstimate,
   hasFile,
+  hasBatchFiles,
 }: ConversionControlsProps) {
   const [showServiceLimits, setShowServiceLimits] = useState(false)
 
@@ -359,9 +363,16 @@ export function ConversionControls({
             Cancel
           </button>
         ) : (
-          <button onClick={onConvert} disabled={converting || !hasFile} className="convert-btn">
-            Convert
-          </button>
+          <>
+            <button onClick={onConvert} disabled={converting || !hasFile} className="convert-btn">
+              Convert
+            </button>
+            {hasBatchFiles && (
+              <button onClick={onBatchConvert} disabled={converting} className="convert-btn">
+                Batch Convert
+              </button>
+            )}
+          </>
         )}
         {hasResult && (
           <button onClick={onDownload} className="download-btn">
