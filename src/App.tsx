@@ -534,12 +534,8 @@ function App() {
       <div className="file-header">
         <div className="file-header-content">
           <div className="logo">
-            <svg viewBox="0 0 32 28" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11 14 L11 8 Q11 6, 11.5 5 Q12 6, 12 8 L12 13"/>
-              <path d="M21 14 L21 8 Q21 6, 20.5 5 Q20 6, 20 8 L20 13"/>
-              <circle cx="16" cy="18" r="7" fill="currentColor" stroke="none"/>
-              <circle cx="13.5" cy="17" r="1" fill="#fff"/>
-              <circle cx="18.5" cy="17" r="1" fill="#fff"/>
+            <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M39.6018 86.2478C2.00431 94.9039 6.19952 53.9469 23.7246 50.4125C32.6017 48.6222 14.5781 14.1139 32.1539 13.0413C46.2146 12.1833 36.3339 44.8067 48.6748 46.0905C61.0157 47.3744 46.8788 10.5945 64.7008 11.9515C82.5229 13.3084 68.4816 44.7593 76.8022 52.4154C97 71.0001 71.7956 98.756 61 86.2478C53.3734 77.4113 69 57.5 87 93" stroke="#8E6F70" strokeWidth="9" strokeLinecap="round"/>
             </svg>
           </div>
           <span className="filename">{file ? file.name : 'No file selected'}</span>
