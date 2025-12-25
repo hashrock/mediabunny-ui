@@ -24,6 +24,20 @@ body {
   flex-direction: column;
 }
 
+/* App body with side panel layout */
+.app-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 /* File Header */
 .file-header {
   background: #fff;
@@ -262,7 +276,144 @@ body {
   border-color: #b71c1c;
 }
 
-/* Service Limits Popup */
+/* Upload Compatibility Side Panel */
+.upload-compatibility-panel {
+  width: 320px;
+  background: #fff;
+  border-left: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.upload-compatibility-panel .panel-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f9f9f9;
+}
+
+.upload-compatibility-panel .panel-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  color: #000;
+}
+
+.upload-compatibility-panel .panel-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.upload-compatibility-panel .panel-status {
+  color: #999;
+  font-size: 13px;
+  text-align: center;
+  padding: 20px 0;
+}
+
+.upload-compatibility-panel .estimated-size {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: #f5f5f5;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.upload-compatibility-panel .size-label {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+}
+
+.upload-compatibility-panel .size-value {
+  font-size: 14px;
+  color: #000;
+  font-weight: 600;
+}
+
+.upload-compatibility-panel .compatibility-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.upload-compatibility-panel .service-item {
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.upload-compatibility-panel .service-header {
+  padding: 10px 12px;
+  background: #f5f5f5;
+  font-size: 13px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.upload-compatibility-panel .service-tiers {
+  display: flex;
+  flex-direction: column;
+}
+
+.upload-compatibility-panel .tier-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 12px;
+}
+
+.upload-compatibility-panel .tier-row:last-child {
+  border-bottom: none;
+}
+
+.upload-compatibility-panel .tier-row.compatible {
+  background: #e8f5e9;
+}
+
+.upload-compatibility-panel .tier-row.incompatible {
+  background: #ffebee;
+}
+
+.upload-compatibility-panel .tier-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.upload-compatibility-panel .tier-icon {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.upload-compatibility-panel .tier-label {
+  font-weight: 500;
+}
+
+.upload-compatibility-panel .tier-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #666;
+}
+
+.upload-compatibility-panel .separator {
+  color: #ccc;
+}
+
+.upload-compatibility-panel .exceeded {
+  color: #d32f2f;
+  font-weight: 600;
+  text-decoration: line-through;
+}
+
+/* Service Limits Popup - removed, now using side panel */
+/* Service Limits Popup - removed, now using side panel */
 .service-limits-popup {
   position: absolute;
   top: 100%;
@@ -651,5 +802,16 @@ body {
 
   .toggle-btn {
     width: 100%;
+  }
+
+  .app-body {
+    flex-direction: column;
+  }
+
+  .upload-compatibility-panel {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid #e0e0e0;
+    max-height: 40vh;
   }
 }
