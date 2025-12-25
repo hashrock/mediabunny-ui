@@ -15,6 +15,7 @@ import { ConversionControls } from './components/ConversionControls'
 import { VideoPreview } from './components/VideoPreview'
 import { FileUpload } from './components/FileUpload'
 import { BatchStatus } from './components/BatchStatus'
+import { UploadCompatibilityPanel } from './components/UploadCompatibilityPanel'
 
 function App() {
   const [file, setFile] = useState<File | null>(null)
@@ -562,40 +563,50 @@ function App() {
         hasBatchFiles={batchFiles.length > 0}
       />
 
-      <FileUpload
-        file={file}
-        files={batchFiles.map(f => f.file)}
-        isDragging={isDragging}
-        onFileSelect={handleFileSelect}
-        onFilesSelect={handleFilesSelect}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      />
+      <div className="app-body">
+        <div className="main-content">
+          <FileUpload
+            file={file}
+            files={batchFiles.map(f => f.file)}
+            isDragging={isDragging}
+            onFileSelect={handleFileSelect}
+            onFilesSelect={handleFilesSelect}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          />
 
-      {batchFiles.length > 0 && <BatchStatus files={batchFiles} />}
+          {batchFiles.length > 0 && <BatchStatus files={batchFiles} />}
 
-      {file && (
-        <VideoPreview
-          file={file}
-          result={result}
-          converting={converting}
-          progress={progress}
-          showAfter={showAfter}
-          onToggleView={setShowAfter}
-          error={error}
-          isDragging={isDragging}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
+          {file && (
+            <VideoPreview
+              file={file}
+              result={result}
+              converting={converting}
+              progress={progress}
+              showAfter={showAfter}
+              onToggleView={setShowAfter}
+              error={error}
+              isDragging={isDragging}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              mediaDuration={mediaDuration}
+              videoDimensions={videoDimensions}
+              videoCodec={videoCodec}
+              audioCodec={audioCodec}
+              metadataTags={metadataTags}
+              onFileSelect={() => fileInputRef.current?.click()}
+            />
+          )}
+        </div>
+
+        <UploadCompatibilityPanel
+          previewEstimate={previewEstimate}
+          settings={settings}
           mediaDuration={mediaDuration}
-          videoDimensions={videoDimensions}
-          videoCodec={videoCodec}
-          audioCodec={audioCodec}
-          metadataTags={metadataTags}
-          onFileSelect={() => fileInputRef.current?.click()}
         />
-      )}
+      </div>
 
       <input
         ref={fileInputRef}
