@@ -10,6 +10,7 @@ import {
   WebMOutputFormat,
   Conversion,
 } from 'mediabunny'
+import GIF from 'gif.js'
 import type { ConversionSettings, ConversionResult, PreviewEstimate, BatchFileStatus } from './types'
 import { ConversionControls } from './components/ConversionControls'
 import { VideoPreview } from './components/VideoPreview'
@@ -140,8 +141,102 @@ function App() {
     [processFile]
   )
 
+  const handleGifConvert = async () => {
+    if (!file) return
+
+    setConverting(true)
+    setProgress(0)
+    setError('')
+    setResult(null)
+
+    try {
+      const video = document.createElement('video')
+      video.src = URL.createObjectURL(file)
+      video.muted = true
+      video.playsInline = true
+
+      await new Promise<void>((resolve, reject) => {
+        video.onloadedmetadata = () => resolve()
+        video.onerror = () => reject(new Error('Failed to load video'))
+      })
+
+      const startTime = settings.startTime ?? 0
+      const endTime = settings.endTime ?? video.duration
+      const duration = endTime - startTime
+      const fps = settings.fps ?? 10
+      const frameDelay = 1000 / fps
+      const totalFrames = Math.ceil(duration * fps)
+
+      const targetWidth = settings.width ?? video.videoWidth
+      const targetHeight = settings.height ?? video.videoHeight
+
+      const canvas = document.createElement('canvas')
+      canvas.width = targetWidth
+      canvas.height = targetHeight
+      const ctx = canvas.getContext('2d')!
+
+      const gif = new GIF({
+        workers: 2,
+        quality: 10,
+        width: targetWidth,
+        height: targetHeight,
+        workerScript: '/gif.worker.js',
+      })
+
+      // Extract frames
+      for (let i = 0; i < totalFrames; i++) {
+        const currentTime = startTime + (i / fps)
+        if (currentTime > endTime) break
+
+        video.currentTime = currentTime
+
+        await new Promise<void>((resolve) => {
+          video.onseeked = () => resolve()
+        })
+
+        ctx.drawImage(video, 0, 0, targetWidth, targetHeight)
+        gif.addFrame(ctx, { copy: true, delay: frameDelay })
+
+        setProgress(Math.round((i / totalFrames) * 80))
+      }
+
+      URL.revokeObjectURL(video.src)
+
+      // Render GIF
+      const blob = await new Promise<Blob>((resolve) => {
+        gif.on('finished', (blob) => resolve(blob))
+        gif.on('progress', (p) => setProgress(80 + Math.round(p * 20)))
+        gif.render()
+      })
+
+      const buffer = await blob.arrayBuffer()
+
+      setProgress(100)
+
+      const filename = file.name.replace(/\.[^.]+$/, '.gif')
+
+      setResult({
+        buffer,
+        originalSize: file.size,
+        convertedSize: buffer.byteLength,
+        filename,
+      })
+
+      setShowAfter(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'GIF conversion failed')
+      console.error('GIF conversion error:', err)
+    } finally {
+      setConverting(false)
+    }
+  }
+
   const handleConvert = async () => {
     if (!file) return
+
+    if (settings.format === 'gif') {
+      return handleGifConvert()
+    }
 
     setConverting(true)
     setProgress(0)
@@ -308,68 +403,147 @@ function App() {
         })
 
         try {
-          const source = new BlobSource(fileStatus.file)
-          const input = new Input({
-            source,
-            formats: ALL_FORMATS,
-          })
+          let buffer: ArrayBuffer
+          let filename: string
 
-          const target = new BufferTarget()
-          let outputFormat
+          if (settings.format === 'gif') {
+            // GIF conversion
+            const video = document.createElement('video')
+            video.src = URL.createObjectURL(fileStatus.file)
+            video.muted = true
+            video.playsInline = true
 
-          switch (settings.format) {
-            case 'mp4':
-              outputFormat = new Mp4OutputFormat()
-              break
-            case 'webm':
-              outputFormat = new WebMOutputFormat()
-              break
-          }
-
-          const output = new Output({
-            target,
-            format: outputFormat,
-          })
-
-          const conversionOptions: any = {
-            input,
-            output,
-            video: {
-              ...(settings.width && { width: settings.width }),
-              ...(settings.height && { height: settings.height }),
-              ...(settings.width && settings.height && { fit: 'contain' }),
-              bitrate: Math.round((settings.quality / 100) * 5_000_000),
-            },
-          }
-
-          const conversion = await Conversion.init(conversionOptions)
-          currentConversionRef.current = conversion
-
-          if (!conversion.isValid) {
-            throw new Error('Conversion is invalid: ' + JSON.stringify(conversion.discardedTracks))
-          }
-
-          conversion.onProgress = (prog) => {
-            const progressPercent = Math.round(prog * 100)
-            setBatchFiles(prev => {
-              const updated = [...prev]
-              updated[i] = { ...updated[i], progress: progressPercent }
-              return updated
+            await new Promise<void>((resolve, reject) => {
+              video.onloadedmetadata = () => resolve()
+              video.onerror = () => reject(new Error('Failed to load video'))
             })
-          }
 
-          await conversion.execute()
+            const startTime = 0
+            const endTime = video.duration
+            const duration = endTime - startTime
+            const fps = settings.fps ?? 10
+            const frameDelay = 1000 / fps
+            const totalFrames = Math.ceil(duration * fps)
 
-          const buffer = target.buffer
-          if (!buffer) {
-            throw new Error('No buffer available after conversion')
+            const targetWidth = settings.width ?? video.videoWidth
+            const targetHeight = settings.height ?? video.videoHeight
+
+            const canvas = document.createElement('canvas')
+            canvas.width = targetWidth
+            canvas.height = targetHeight
+            const ctx = canvas.getContext('2d')!
+
+            const gif = new GIF({
+              workers: 2,
+              quality: 10,
+              width: targetWidth,
+              height: targetHeight,
+              workerScript: '/gif.worker.js',
+            })
+
+            for (let j = 0; j < totalFrames; j++) {
+              const currentTime = startTime + (j / fps)
+              if (currentTime > endTime) break
+
+              video.currentTime = currentTime
+
+              await new Promise<void>((resolve) => {
+                video.onseeked = () => resolve()
+              })
+
+              ctx.drawImage(video, 0, 0, targetWidth, targetHeight)
+              gif.addFrame(ctx, { copy: true, delay: frameDelay })
+
+              const progressPercent = Math.round((j / totalFrames) * 80)
+              setBatchFiles(prev => {
+                const updated = [...prev]
+                updated[i] = { ...updated[i], progress: progressPercent }
+                return updated
+              })
+            }
+
+            URL.revokeObjectURL(video.src)
+
+            const blob = await new Promise<Blob>((resolve) => {
+              gif.on('finished', (blob) => resolve(blob))
+              gif.on('progress', (p) => {
+                const progressPercent = 80 + Math.round(p * 20)
+                setBatchFiles(prev => {
+                  const updated = [...prev]
+                  updated[i] = { ...updated[i], progress: progressPercent }
+                  return updated
+                })
+              })
+              gif.render()
+            })
+
+            buffer = await blob.arrayBuffer()
+            filename = fileStatus.file.name.replace(/\.[^.]+$/, '.gif')
+          } else {
+            // MP4/WebM conversion
+            const source = new BlobSource(fileStatus.file)
+            const input = new Input({
+              source,
+              formats: ALL_FORMATS,
+            })
+
+            const target = new BufferTarget()
+            let outputFormat
+
+            switch (settings.format) {
+              case 'mp4':
+                outputFormat = new Mp4OutputFormat()
+                break
+              case 'webm':
+                outputFormat = new WebMOutputFormat()
+                break
+            }
+
+            const output = new Output({
+              target,
+              format: outputFormat,
+            })
+
+            const conversionOptions: any = {
+              input,
+              output,
+              video: {
+                ...(settings.width && { width: settings.width }),
+                ...(settings.height && { height: settings.height }),
+                ...(settings.width && settings.height && { fit: 'contain' }),
+                bitrate: Math.round((settings.quality / 100) * 5_000_000),
+              },
+            }
+
+            const conversion = await Conversion.init(conversionOptions)
+            currentConversionRef.current = conversion
+
+            if (!conversion.isValid) {
+              throw new Error('Conversion is invalid: ' + JSON.stringify(conversion.discardedTracks))
+            }
+
+            conversion.onProgress = (prog) => {
+              const progressPercent = Math.round(prog * 100)
+              setBatchFiles(prev => {
+                const updated = [...prev]
+                updated[i] = { ...updated[i], progress: progressPercent }
+                return updated
+              })
+            }
+
+            await conversion.execute()
+
+            const targetBuffer = target.buffer
+            if (!targetBuffer) {
+              throw new Error('No buffer available after conversion')
+            }
+
+            buffer = targetBuffer
+            filename = fileStatus.file.name.replace(/\.[^.]+$/, `.${settings.format}`)
           }
 
           const convertedSize = buffer.byteLength
           const originalSize = fileStatus.file.size
-
-          const fileExtension = settings.format
-          const filename = fileStatus.file.name.replace(/\.[^.]+$/, `.${fileExtension}`)
 
           const conversionResult: ConversionResult = {
             buffer,
@@ -436,6 +610,37 @@ function App() {
     if (!file) return
 
     setPreviewEstimate({ estimatedSize: 0, isEstimating: true })
+
+    // For GIF, use rough estimation based on resolution and frame count
+    if (currentSettings.format === 'gif') {
+      try {
+        const video = document.createElement('video')
+        video.src = URL.createObjectURL(file)
+        video.muted = true
+
+        await new Promise<void>((resolve, reject) => {
+          video.onloadedmetadata = () => resolve()
+          video.onerror = () => reject(new Error('Failed to load video'))
+        })
+
+        const duration = (currentSettings.endTime ?? video.duration) - (currentSettings.startTime ?? 0)
+        const fps = currentSettings.fps ?? 10
+        const width = currentSettings.width ?? video.videoWidth
+        const height = currentSettings.height ?? video.videoHeight
+
+        // Rough GIF size estimation: ~0.5 bytes per pixel per frame (compressed)
+        const pixelsPerFrame = width * height
+        const totalFrames = Math.ceil(duration * fps)
+        const estimatedSize = Math.round(pixelsPerFrame * totalFrames * 0.3)
+
+        URL.revokeObjectURL(video.src)
+        setPreviewEstimate({ estimatedSize, isEstimating: false })
+      } catch (err) {
+        console.error('GIF preview estimation error:', err)
+        setPreviewEstimate({ estimatedSize: 0, isEstimating: false })
+      }
+      return
+    }
 
     try {
       const source = new BlobSource(file)

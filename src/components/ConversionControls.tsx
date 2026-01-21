@@ -42,27 +42,46 @@ export function ConversionControls({
           onChange={(e) =>
             onSettingsChange({
               ...settings,
-              format: e.target.value as 'mp4' | 'webm',
+              format: e.target.value as 'mp4' | 'webm' | 'gif',
+              fps: e.target.value === 'gif' ? (settings.fps ?? 10) : settings.fps,
             })
           }
         >
           <option value="mp4">MP4</option>
           <option value="webm">WebM</option>
+          <option value="gif">GIF</option>
         </select>
       </div>
 
-      <div className="control-group">
-        <label>Quality {settings.quality}%</label>
-        <input
-          type="range"
-          min="1"
-          max="100"
-          value={settings.quality}
-          onChange={(e) =>
-            onSettingsChange({ ...settings, quality: Number(e.target.value) })
-          }
-        />
-      </div>
+      {settings.format !== 'gif' && (
+        <div className="control-group">
+          <label>Quality {settings.quality}%</label>
+          <input
+            type="range"
+            min="1"
+            max="100"
+            value={settings.quality}
+            onChange={(e) =>
+              onSettingsChange({ ...settings, quality: Number(e.target.value) })
+            }
+          />
+        </div>
+      )}
+
+      {settings.format === 'gif' && (
+        <div className="control-group">
+          <label>FPS {settings.fps ?? 10}</label>
+          <input
+            type="range"
+            min="1"
+            max="30"
+            value={settings.fps ?? 10}
+            onChange={(e) =>
+              onSettingsChange({ ...settings, fps: Number(e.target.value) })
+            }
+          />
+        </div>
+      )}
 
       <div className="control-group">
         <label>Width</label>
