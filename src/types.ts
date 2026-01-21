@@ -1,10 +1,11 @@
 export interface ConversionSettings {
-  format: 'mp4' | 'webm'
+  format: 'mp4' | 'webm' | 'gif'
   width?: number
   height?: number
   quality: number
   startTime?: number
   endTime?: number
+  fps?: number // GIF frame rate (default: 10)
 }
 
 export interface ConversionResult {
