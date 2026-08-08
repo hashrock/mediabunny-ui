@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import './App.css'
 import { BatchStatus } from './components/BatchStatus'
 import { ConversionControls } from './components/ConversionControls'
@@ -34,10 +34,10 @@ function App() {
 
   const converting = job.running || batch.running
 
-  // 変換が終わったら結果側の表示に切り替える（その後の手動切り替えは妨げない）
-  useEffect(() => {
-    if (job.state.kind === 'done') setShowAfter(true)
-  }, [job.state.kind])
+  const handleConvert = async () => {
+    // 変換できたら結果側に切り替える（その後の手動切り替えは妨げない）
+    if (await job.convert()) setShowAfter(true)
+  }
 
   const selectFile = useCallback(
     async (selected: File) => {
@@ -122,7 +122,7 @@ function App() {
       <ConversionControls
         settings={settings}
         onSettingsChange={setSettings}
-        onConvert={job.convert}
+        onConvert={handleConvert}
         onBatchConvert={batch.run}
         onReset={handleReset}
         onDownload={job.download}

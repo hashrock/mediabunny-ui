@@ -26,10 +26,7 @@ export function useSizeEstimate({
   const [estimate, setEstimate] = useState<PreviewEstimate>(IDLE)
 
   useEffect(() => {
-    if (!file || !media) {
-      setEstimate(IDLE)
-      return
-    }
+    if (!file || !media) return
 
     const controller = new AbortController()
     const timer = setTimeout(async () => {
@@ -56,5 +53,6 @@ export function useSizeEstimate({
     }
   }, [file, settings, media])
 
-  return estimate
+  // 対象がないときは、内部に残っている直前の推定値ではなく初期値を返す
+  return file && media ? estimate : IDLE
 }

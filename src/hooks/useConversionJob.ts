@@ -25,7 +25,8 @@ export interface ConversionJob {
   progress: number
   result: ConversionResult | null
   error: string
-  convert: () => Promise<void>
+  /** 変換結果を返す。失敗・中断時は null */
+  convert: () => Promise<ConversionResult | null>
   cancel: () => void
   reset: () => void
   download: () => void
@@ -40,7 +41,7 @@ export function useConversionJob({
   const abortRef = useRef<AbortController | null>(null)
 
   const convert = useCallback(async () => {
-    if (!file) return
+    if (!file) return null
 
     const controller = new AbortController()
     abortRef.current = controller
@@ -54,12 +55,15 @@ export function useConversionJob({
         signal: controller.signal,
         onProgress: (progress) => dispatch({ type: 'progress', value: Math.round(progress * 100) }),
       })
-      dispatch({ type: 'done', result: toConversionResult(file, encoded) })
+      const converted = toConversionResult(file, encoded)
+      dispatch({ type: 'done', result: converted })
+      return converted
     } catch (err) {
       // 中断は cancel() 側で状態に反映済みなので、ここでは何もしない
-      if (isAbortError(err)) return
+      if (isAbortError(err)) return null
       console.error('Conversion error:', err)
       dispatch({ type: 'fail', message: err instanceof Error ? err.message : 'Conversion failed' })
+      return null
     } finally {
       if (abortRef.current === controller) abortRef.current = null
     }

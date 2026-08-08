@@ -31,6 +31,6 @@ export async function writeFileToDirectory(
     await writable.close()
   } catch (err) {
     console.error('Error saving file:', err)
-    throw new Error(`Failed to save ${filename} to disk`)
+    throw new Error(`Failed to save ${filename} to disk`, { cause: err })
   }
 }
