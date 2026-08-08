@@ -1,5 +1,6 @@
 import type { ConversionSettings, PreviewEstimate } from '../types'
 import serviceLimits from '../serviceLimits.json'
+import { formatBytes } from '../utils/format'
 
 interface UploadCompatibilityPanelProps {
   previewEstimate: PreviewEstimate
@@ -12,14 +13,6 @@ export function UploadCompatibilityPanel({
   settings,
   mediaDuration,
 }: UploadCompatibilityPanelProps) {
-  const formatSize = (bytes: number) => {
-    if (bytes === 0) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
-  }
-
   const checkServiceCompatibility = (estimatedSize: number, duration: number) => {
     return serviceLimits.services.map(service => {
       const tierResults = service.limits.map(limit => {
@@ -65,7 +58,7 @@ export function UploadCompatibilityPanel({
           <>
             <div className="estimated-size">
               <span className="size-label">Estimated Size:</span>
-              <span className="size-value">{formatSize(previewEstimate.estimatedSize)}</span>
+              <span className="size-value">{formatBytes(previewEstimate.estimatedSize)}</span>
             </div>
             <div className="compatibility-list">
               {compatibility.map((service) => (
@@ -82,7 +75,7 @@ export function UploadCompatibilityPanel({
                         </div>
                         <div className="tier-right">
                           <span className={tier.sizeExceeded ? 'exceeded' : ''}>
-                            {formatSize(tier.maxSize)}
+                            {formatBytes(tier.maxSize)}
                           </span>
                           {tier.maxDuration && (
                             <>

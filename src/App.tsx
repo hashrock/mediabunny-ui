@@ -1,46 +1,73 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
-import {
-  Input,
-  ALL_FORMATS,
-  BlobSource,
-  Output,
-  BufferTarget,
-  Mp4OutputFormat,
-  WebMOutputFormat,
-  Conversion,
-} from 'mediabunny'
-import GIF from 'gif.js'
-import type { ConversionSettings, ConversionResult, PreviewEstimate, BatchFileStatus } from './types'
-import { ConversionControls } from './components/ConversionControls'
-import { VideoPreview } from './components/VideoPreview'
-import { FileUpload } from './components/FileUpload'
 import { BatchStatus } from './components/BatchStatus'
+import { ConversionControls } from './components/ConversionControls'
+import { FileUpload } from './components/FileUpload'
 import { UploadCompatibilityPanel } from './components/UploadCompatibilityPanel'
+import { VideoPreview } from './components/VideoPreview'
+import { probeMedia } from './converters'
+import { useBatchConversion } from './hooks/useBatchConversion'
+import { useConversionJob } from './hooks/useConversionJob'
+import { useSizeEstimate } from './hooks/useSizeEstimate'
+import type { ConversionSettings, MediaInfo } from './types'
+
+const DEFAULT_SETTINGS: ConversionSettings = {
+  format: 'mp4',
+  quality: 80,
+}
 
 function App() {
   const [file, setFile] = useState<File | null>(null)
-  const [batchFiles, setBatchFiles] = useState<BatchFileStatus[]>([])
+  const [media, setMedia] = useState<MediaInfo | null>(null)
+  const [settings, setSettings] = useState<ConversionSettings>(DEFAULT_SETTINGS)
   const [isDragging, setIsDragging] = useState(false)
-  const [settings, setSettings] = useState<ConversionSettings>({
-    format: 'mp4',
-    quality: 80,
-  })
-  const [converting, setConverting] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [result, setResult] = useState<ConversionResult | null>(null)
-  const [error, setError] = useState<string>('')
-  const [mediaDuration, setMediaDuration] = useState<number | null>(null)
-  const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: number } | null>(null)
-  const [videoCodec, setVideoCodec] = useState<string | null>(null)
-  const [audioCodec, setAudioCodec] = useState<string | null>(null)
-  const [metadataTags, setMetadataTags] = useState<any>(null)
   const [showAfter, setShowAfter] = useState(false)
-  const [previewEstimate, setPreviewEstimate] = useState<PreviewEstimate>({ estimatedSize: 0, isEstimating: false })
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const currentConversionRef = useRef<Conversion | null>(null)
-  const previewTimeoutRef = useRef<number | null>(null)
-  const outputDirHandleRef = useRef<FileSystemDirectoryHandle | null>(null)
+
+  const job = useConversionJob({ file, settings, media })
+  const batch = useBatchConversion(settings)
+  const previewEstimate = useSizeEstimate({ file, settings, media })
+
+  // ファイル選択時に使う操作だけを取り出す（いずれも参照が安定している）
+  const { reset: resetJob } = job
+  const { clear: clearBatch, setFiles: setBatchFiles } = batch
+
+  const converting = job.running || batch.running
+
+  // 変換が終わったら結果側の表示に切り替える（その後の手動切り替えは妨げない）
+  useEffect(() => {
+    if (job.state.kind === 'done') setShowAfter(true)
+  }, [job.state.kind])
+
+  const selectFile = useCallback(
+    async (selected: File) => {
+      setFile(selected)
+      setMedia(null)
+      setShowAfter(false)
+      resetJob()
+      clearBatch()
+
+      try {
+        const info = await probeMedia(selected)
+        setMedia(info)
+        setSettings((prev) => ({ ...prev, startTime: 0, endTime: info.duration }))
+      } catch (err) {
+        console.error('Failed to get media information:', err)
+      }
+    },
+    [resetJob, clearBatch]
+  )
+
+  const selectFiles = useCallback(
+    (selected: File[]) => {
+      setFile(null)
+      setMedia(null)
+      setShowAfter(false)
+      resetJob()
+      setBatchFiles(selected)
+    },
+    [resetJob, setBatchFiles]
+  )
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -52,688 +79,29 @@ function App() {
     setIsDragging(false)
   }, [])
 
-  const processFile = useCallback(async (selectedFile: File) => {
-    setFile(selectedFile)
-    setResult(null)
-    setError('')
-    setShowAfter(false)
-    setVideoDimensions(null)
-    setVideoCodec(null)
-    setAudioCodec(null)
-    setMetadataTags(null)
-
-    try {
-      const input = new Input({
-        source: new BlobSource(selectedFile),
-        formats: ALL_FORMATS,
-      })
-      const duration = await input.computeDuration()
-      setMediaDuration(duration)
-
-      setSettings((prev) => ({
-        ...prev,
-        startTime: 0,
-        endTime: duration,
-      }))
-
-      // Get track information
-      const videoTracks = await input.getVideoTracks()
-      const audioTracks = await input.getAudioTracks()
-
-      if (videoTracks.length > 0) {
-        const videoTrack = videoTracks[0]
-        setVideoDimensions({
-          width: videoTrack.displayWidth,
-          height: videoTrack.displayHeight
-        })
-        setVideoCodec(videoTrack.codec || null)
-      }
-
-      if (audioTracks.length > 0) {
-        const audioTrack = audioTracks[0]
-        setAudioCodec(audioTrack.codec || null)
-      }
-
-      // Get metadata tags
-      try {
-        const tags = await input.getMetadataTags()
-        setMetadataTags(tags)
-      } catch (err) {
-        console.warn('Failed to get metadata tags:', err)
-      }
-    } catch (err) {
-      console.error('Failed to get media information:', err)
-    }
-  }, [])
-
-  const handleFilesSelect = useCallback((selectedFiles: File[]) => {
-    setBatchFiles(
-      selectedFiles.map(file => ({
-        file,
-        status: 'pending' as const,
-        progress: 0,
-      }))
-    )
-    setFile(null)
-    setResult(null)
-    setError('')
-  }, [])
-
   const handleDrop = useCallback(
     async (e: React.DragEvent) => {
       e.preventDefault()
       setIsDragging(false)
 
-      const droppedFiles = Array.from(e.dataTransfer.files)
-      if (droppedFiles.length === 1) {
-        await processFile(droppedFiles[0])
-      } else if (droppedFiles.length > 1) {
-        handleFilesSelect(droppedFiles)
+      const dropped = Array.from(e.dataTransfer.files)
+      if (dropped.length === 1) {
+        await selectFile(dropped[0])
+      } else if (dropped.length > 1) {
+        selectFiles(dropped)
       }
     },
-    [processFile, handleFilesSelect]
+    [selectFile, selectFiles]
   )
-
-  const handleFileSelect = useCallback(
-    async (selectedFile: File) => {
-      await processFile(selectedFile)
-    },
-    [processFile]
-  )
-
-  const handleGifConvert = async () => {
-    if (!file) return
-
-    setConverting(true)
-    setProgress(0)
-    setError('')
-    setResult(null)
-
-    try {
-      const video = document.createElement('video')
-      video.src = URL.createObjectURL(file)
-      video.muted = true
-      video.playsInline = true
-
-      await new Promise<void>((resolve, reject) => {
-        video.onloadedmetadata = () => resolve()
-        video.onerror = () => reject(new Error('Failed to load video'))
-      })
-
-      const startTime = settings.startTime ?? 0
-      const endTime = settings.endTime ?? video.duration
-      const duration = endTime - startTime
-      const fps = settings.fps ?? 10
-      const frameDelay = 1000 / fps
-      const totalFrames = Math.ceil(duration * fps)
-
-      const targetWidth = settings.width ?? video.videoWidth
-      const targetHeight = settings.height ?? video.videoHeight
-
-      const canvas = document.createElement('canvas')
-      canvas.width = targetWidth
-      canvas.height = targetHeight
-      const ctx = canvas.getContext('2d')!
-
-      const gif = new GIF({
-        workers: 2,
-        quality: 10,
-        width: targetWidth,
-        height: targetHeight,
-        workerScript: '/gif.worker.js',
-      })
-
-      // Extract frames
-      for (let i = 0; i < totalFrames; i++) {
-        const currentTime = startTime + (i / fps)
-        if (currentTime > endTime) break
-
-        video.currentTime = currentTime
-
-        await new Promise<void>((resolve) => {
-          video.onseeked = () => resolve()
-        })
-
-        ctx.drawImage(video, 0, 0, targetWidth, targetHeight)
-        gif.addFrame(ctx, { copy: true, delay: frameDelay })
-
-        setProgress(Math.round((i / totalFrames) * 80))
-      }
-
-      URL.revokeObjectURL(video.src)
-
-      // Render GIF
-      const blob = await new Promise<Blob>((resolve) => {
-        gif.on('finished', (blob) => resolve(blob))
-        gif.on('progress', (p) => setProgress(80 + Math.round(p * 20)))
-        gif.render()
-      })
-
-      const buffer = await blob.arrayBuffer()
-
-      setProgress(100)
-
-      const filename = file.name.replace(/\.[^.]+$/, '.gif')
-
-      setResult({
-        buffer,
-        originalSize: file.size,
-        convertedSize: buffer.byteLength,
-        filename,
-      })
-
-      setShowAfter(true)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'GIF conversion failed')
-      console.error('GIF conversion error:', err)
-    } finally {
-      setConverting(false)
-    }
-  }
-
-  const handleConvert = async () => {
-    if (!file) return
-
-    if (settings.format === 'gif') {
-      return handleGifConvert()
-    }
-
-    setConverting(true)
-    setProgress(0)
-    setError('')
-    setResult(null)
-
-    try {
-      const source = new BlobSource(file)
-      const input = new Input({
-        source,
-        formats: ALL_FORMATS,
-      })
-
-      const target = new BufferTarget()
-      let outputFormat
-
-      switch (settings.format) {
-        case 'mp4':
-          outputFormat = new Mp4OutputFormat()
-          break
-        case 'webm':
-          outputFormat = new WebMOutputFormat()
-          break
-      }
-
-      const output = new Output({
-        target,
-        format: outputFormat,
-      })
-
-      const conversionOptions: any = {
-        input,
-        output,
-        video: {
-          ...(settings.width && { width: settings.width }),
-          ...(settings.height && { height: settings.height }),
-          ...(settings.width && settings.height && { fit: 'contain' }),
-          bitrate: Math.round((settings.quality / 100) * 5_000_000),
-        },
-      }
-
-      // Add trim if start or end time is set
-      if ((settings.startTime !== undefined && settings.startTime !== null) ||
-          (settings.endTime !== undefined && settings.endTime !== null)) {
-        conversionOptions.trim = {
-          start: settings.startTime ?? 0,
-          end: settings.endTime ?? mediaDuration ?? undefined,
-        }
-      }
-
-      const conversion = await Conversion.init(conversionOptions)
-
-      currentConversionRef.current = conversion
-
-      if (!conversion.isValid) {
-        throw new Error('Conversion is invalid: ' + JSON.stringify(conversion.discardedTracks))
-      }
-
-      conversion.onProgress = (prog) => {
-        setProgress(Math.round(prog * 100))
-      }
-
-      await conversion.execute()
-
-      setProgress(100)
-
-      const buffer = target.buffer
-      if (!buffer) {
-        throw new Error('No buffer available after conversion')
-      }
-
-      const convertedSize = buffer.byteLength
-      const originalSize = file.size
-
-      const fileExtension = settings.format
-      const filename = file.name.replace(/\.[^.]+$/, `.${fileExtension}`)
-
-      setResult({
-        buffer,
-        originalSize,
-        convertedSize,
-        filename,
-      })
-
-      setShowAfter(true)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Conversion failed')
-      console.error('Conversion error:', err)
-    } finally {
-      setConverting(false)
-      currentConversionRef.current = null
-    }
-  }
-
-  const handleDownload = () => {
-    if (!result) return
-
-    const blob = new Blob([result.buffer])
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = result.filename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
-
-  const handleReset = () => {
-    setSettings({
-      format: 'mp4',
-      quality: 80,
-    })
-  }
 
   const handleCancel = () => {
-    if (currentConversionRef.current) {
-      currentConversionRef.current.cancel()
-      currentConversionRef.current = null
-      setConverting(false)
-      setProgress(0)
-      setError('Conversion cancelled')
-    }
+    if (batch.running) batch.cancel()
+    else job.cancel()
   }
 
-  const handleBatchConvert = async () => {
-    if (batchFiles.length === 0) return
+  const handleReset = () => setSettings(DEFAULT_SETTINGS)
 
-    // Request directory handle using File System Access API
-    try {
-      // Check if the browser supports the File System Access API
-      if (!('showDirectoryPicker' in window)) {
-        setError('File System Access API is not supported in this browser. Please use Chrome or Edge.')
-        return
-      }
-
-      const dirHandle = await (window as any).showDirectoryPicker()
-      outputDirHandleRef.current = dirHandle
-
-      // Request write permission upfront
-      try {
-        const permission = await dirHandle.requestPermission({ mode: 'readwrite' })
-        if (permission !== 'granted') {
-          setError('Write permission not granted for the selected folder')
-          return
-        }
-      } catch (permError) {
-        console.warn('Permission request not supported or failed:', permError)
-        // Continue anyway as some browsers may not support requestPermission
-      }
-
-      setConverting(true)
-      setError('')
-
-      // Convert each file
-      for (let i = 0; i < batchFiles.length; i++) {
-        const fileStatus = batchFiles[i]
-        
-        // Update status to converting
-        setBatchFiles(prev => {
-          const updated = [...prev]
-          updated[i] = { ...updated[i], status: 'converting', progress: 0 }
-          return updated
-        })
-
-        try {
-          let buffer: ArrayBuffer
-          let filename: string
-
-          if (settings.format === 'gif') {
-            // GIF conversion
-            const video = document.createElement('video')
-            video.src = URL.createObjectURL(fileStatus.file)
-            video.muted = true
-            video.playsInline = true
-
-            await new Promise<void>((resolve, reject) => {
-              video.onloadedmetadata = () => resolve()
-              video.onerror = () => reject(new Error('Failed to load video'))
-            })
-
-            const startTime = 0
-            const endTime = video.duration
-            const duration = endTime - startTime
-            const fps = settings.fps ?? 10
-            const frameDelay = 1000 / fps
-            const totalFrames = Math.ceil(duration * fps)
-
-            const targetWidth = settings.width ?? video.videoWidth
-            const targetHeight = settings.height ?? video.videoHeight
-
-            const canvas = document.createElement('canvas')
-            canvas.width = targetWidth
-            canvas.height = targetHeight
-            const ctx = canvas.getContext('2d')!
-
-            const gif = new GIF({
-              workers: 2,
-              quality: 10,
-              width: targetWidth,
-              height: targetHeight,
-              workerScript: '/gif.worker.js',
-            })
-
-            for (let j = 0; j < totalFrames; j++) {
-              const currentTime = startTime + (j / fps)
-              if (currentTime > endTime) break
-
-              video.currentTime = currentTime
-
-              await new Promise<void>((resolve) => {
-                video.onseeked = () => resolve()
-              })
-
-              ctx.drawImage(video, 0, 0, targetWidth, targetHeight)
-              gif.addFrame(ctx, { copy: true, delay: frameDelay })
-
-              const progressPercent = Math.round((j / totalFrames) * 80)
-              setBatchFiles(prev => {
-                const updated = [...prev]
-                updated[i] = { ...updated[i], progress: progressPercent }
-                return updated
-              })
-            }
-
-            URL.revokeObjectURL(video.src)
-
-            const blob = await new Promise<Blob>((resolve) => {
-              gif.on('finished', (blob) => resolve(blob))
-              gif.on('progress', (p) => {
-                const progressPercent = 80 + Math.round(p * 20)
-                setBatchFiles(prev => {
-                  const updated = [...prev]
-                  updated[i] = { ...updated[i], progress: progressPercent }
-                  return updated
-                })
-              })
-              gif.render()
-            })
-
-            buffer = await blob.arrayBuffer()
-            filename = fileStatus.file.name.replace(/\.[^.]+$/, '.gif')
-          } else {
-            // MP4/WebM conversion
-            const source = new BlobSource(fileStatus.file)
-            const input = new Input({
-              source,
-              formats: ALL_FORMATS,
-            })
-
-            const target = new BufferTarget()
-            let outputFormat
-
-            switch (settings.format) {
-              case 'mp4':
-                outputFormat = new Mp4OutputFormat()
-                break
-              case 'webm':
-                outputFormat = new WebMOutputFormat()
-                break
-            }
-
-            const output = new Output({
-              target,
-              format: outputFormat,
-            })
-
-            const conversionOptions: any = {
-              input,
-              output,
-              video: {
-                ...(settings.width && { width: settings.width }),
-                ...(settings.height && { height: settings.height }),
-                ...(settings.width && settings.height && { fit: 'contain' }),
-                bitrate: Math.round((settings.quality / 100) * 5_000_000),
-              },
-            }
-
-            const conversion = await Conversion.init(conversionOptions)
-            currentConversionRef.current = conversion
-
-            if (!conversion.isValid) {
-              throw new Error('Conversion is invalid: ' + JSON.stringify(conversion.discardedTracks))
-            }
-
-            conversion.onProgress = (prog) => {
-              const progressPercent = Math.round(prog * 100)
-              setBatchFiles(prev => {
-                const updated = [...prev]
-                updated[i] = { ...updated[i], progress: progressPercent }
-                return updated
-              })
-            }
-
-            await conversion.execute()
-
-            const targetBuffer = target.buffer
-            if (!targetBuffer) {
-              throw new Error('No buffer available after conversion')
-            }
-
-            buffer = targetBuffer
-            filename = fileStatus.file.name.replace(/\.[^.]+$/, `.${settings.format}`)
-          }
-
-          const convertedSize = buffer.byteLength
-          const originalSize = fileStatus.file.size
-
-          const conversionResult: ConversionResult = {
-            buffer,
-            originalSize,
-            convertedSize,
-            filename,
-          }
-
-          // Save file using File System Access API
-          try {
-            const fileHandle = await dirHandle.getFileHandle(filename, { create: true })
-            const writable = await fileHandle.createWritable()
-            await writable.write(buffer)
-            await writable.close()
-          } catch (saveError) {
-            console.error('Error saving file:', saveError)
-            throw new Error('Failed to save file to disk')
-          }
-
-          // Update status to completed
-          setBatchFiles(prev => {
-            const updated = [...prev]
-            updated[i] = {
-              ...updated[i],
-              status: 'completed',
-              progress: 100,
-              result: conversionResult,
-            }
-            return updated
-          })
-        } catch (err) {
-          const errorMessage = err instanceof Error ? err.message : 'Conversion failed'
-          console.error('Conversion error for', fileStatus.file.name, ':', err)
-          
-          // Update status to error
-          setBatchFiles(prev => {
-            const updated = [...prev]
-            updated[i] = {
-              ...updated[i],
-              status: 'error',
-              error: errorMessage,
-            }
-            return updated
-          })
-        } finally {
-          currentConversionRef.current = null
-        }
-      }
-
-      setConverting(false)
-      setError('') // Clear error message after successful batch conversion
-    } catch (err) {
-      if ((err as Error).name === 'AbortError') {
-        setError('Folder selection was cancelled')
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to select output folder')
-      }
-      setConverting(false)
-      console.error('Batch conversion error:', err)
-    }
-  }
-
-  const runPreviewEncode = useCallback(async (currentSettings: ConversionSettings) => {
-    if (!file) return
-
-    setPreviewEstimate({ estimatedSize: 0, isEstimating: true })
-
-    // For GIF, use rough estimation based on resolution and frame count
-    if (currentSettings.format === 'gif') {
-      try {
-        const video = document.createElement('video')
-        video.src = URL.createObjectURL(file)
-        video.muted = true
-
-        await new Promise<void>((resolve, reject) => {
-          video.onloadedmetadata = () => resolve()
-          video.onerror = () => reject(new Error('Failed to load video'))
-        })
-
-        const duration = (currentSettings.endTime ?? video.duration) - (currentSettings.startTime ?? 0)
-        const fps = currentSettings.fps ?? 10
-        const width = currentSettings.width ?? video.videoWidth
-        const height = currentSettings.height ?? video.videoHeight
-
-        // Rough GIF size estimation: ~0.5 bytes per pixel per frame (compressed)
-        const pixelsPerFrame = width * height
-        const totalFrames = Math.ceil(duration * fps)
-        const estimatedSize = Math.round(pixelsPerFrame * totalFrames * 0.3)
-
-        URL.revokeObjectURL(video.src)
-        setPreviewEstimate({ estimatedSize, isEstimating: false })
-      } catch (err) {
-        console.error('GIF preview estimation error:', err)
-        setPreviewEstimate({ estimatedSize: 0, isEstimating: false })
-      }
-      return
-    }
-
-    try {
-      const source = new BlobSource(file)
-      const input = new Input({
-        source,
-        formats: ALL_FORMATS,
-      })
-
-      const target = new BufferTarget()
-      let outputFormat
-
-      switch (currentSettings.format) {
-        case 'mp4':
-          outputFormat = new Mp4OutputFormat()
-          break
-        case 'webm':
-          outputFormat = new WebMOutputFormat()
-          break
-      }
-
-      const output = new Output({
-        target,
-        format: outputFormat,
-      })
-
-      const conversionOptions: any = {
-        input,
-        output,
-        video: {
-          ...(currentSettings.width && { width: currentSettings.width }),
-          ...(currentSettings.height && { height: currentSettings.height }),
-          bitrate: Math.round((currentSettings.quality / 100) * 5_000_000),
-        },
-      }
-
-      // Encode only 1 second for better accuracy
-      const previewDuration = 1.0
-      conversionOptions.trim = {
-        start: currentSettings.startTime ?? 0,
-        end: (currentSettings.startTime ?? 0) + previewDuration,
-      }
-
-      const conversion = await Conversion.init(conversionOptions)
-
-      if (!conversion.isValid) {
-        console.warn('Preview conversion is invalid')
-        setPreviewEstimate({ estimatedSize: 0, isEstimating: false })
-        return
-      }
-
-      await conversion.execute()
-
-      const buffer = target.buffer
-      if (!buffer) {
-        setPreviewEstimate({ estimatedSize: 0, isEstimating: false })
-        return
-      }
-
-      const previewSize = buffer.byteLength
-      const duration = (currentSettings.endTime ?? mediaDuration ?? 0) - (currentSettings.startTime ?? 0)
-
-      // Estimate full size based on preview sample
-      const estimatedFullSize = Math.round((previewSize / previewDuration) * duration)
-
-      setPreviewEstimate({ estimatedSize: estimatedFullSize, isEstimating: false })
-    } catch (err) {
-      console.error('Preview encode error:', err)
-      setPreviewEstimate({ estimatedSize: 0, isEstimating: false })
-    }
-  }, [file, mediaDuration])
-
-  // Debounced preview encode
-  useEffect(() => {
-    if (!file) return
-
-    // Clear previous timeout
-    if (previewTimeoutRef.current) {
-      clearTimeout(previewTimeoutRef.current)
-    }
-
-    // Set new timeout for 500ms debounce
-    previewTimeoutRef.current = setTimeout(() => {
-      runPreviewEncode(settings)
-    }, 500)
-
-    return () => {
-      if (previewTimeoutRef.current) {
-        clearTimeout(previewTimeoutRef.current)
-      }
-    }
-  }, [settings, file, runPreviewEncode])
-
-  const isVideo = file?.type.startsWith('video/')
+  const isVideo = file?.type.startsWith('video/') ?? false
 
   return (
     <div className="app">
@@ -750,58 +118,55 @@ function App() {
           </button>
         </div>
       </div>
+
       <ConversionControls
         settings={settings}
         onSettingsChange={setSettings}
-        onConvert={handleConvert}
-        onBatchConvert={handleBatchConvert}
+        onConvert={job.convert}
+        onBatchConvert={batch.run}
         onReset={handleReset}
-        onDownload={handleDownload}
+        onDownload={job.download}
         onCancel={handleCancel}
         converting={converting}
-        progress={progress}
-        hasResult={!!result}
-        isVideo={!!isVideo}
-        mediaDuration={mediaDuration}
+        progress={job.progress}
+        hasResult={!!job.result}
+        isVideo={isVideo}
+        mediaDuration={media?.duration ?? null}
         previewEstimate={previewEstimate}
         hasFile={!!file}
-        hasBatchFiles={batchFiles.length > 0}
+        hasBatchFiles={batch.files.length > 0}
       />
 
       <div className="app-body">
         <div className="main-content">
           <FileUpload
             file={file}
-            files={batchFiles.map(f => f.file)}
+            files={batch.files.map((item) => item.file)}
             isDragging={isDragging}
-            onFileSelect={handleFileSelect}
-            onFilesSelect={handleFilesSelect}
+            onFileSelect={selectFile}
+            onFilesSelect={selectFiles}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           />
 
-          {batchFiles.length > 0 && <BatchStatus files={batchFiles} />}
+          {batch.error && <div className="error-message">{batch.error}</div>}
+          {batch.files.length > 0 && <BatchStatus files={batch.files} />}
 
           {file && (
             <VideoPreview
               file={file}
-              result={result}
-              converting={converting}
-              progress={progress}
+              media={media}
+              result={job.result}
+              converting={job.running}
+              progress={job.progress}
               showAfter={showAfter}
               onToggleView={setShowAfter}
-              error={error}
+              error={job.error}
               isDragging={isDragging}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              mediaDuration={mediaDuration}
-              videoDimensions={videoDimensions}
-              videoCodec={videoCodec}
-              audioCodec={audioCodec}
-              metadataTags={metadataTags}
-              onFileSelect={() => fileInputRef.current?.click()}
             />
           )}
         </div>
@@ -809,7 +174,7 @@ function App() {
         <UploadCompatibilityPanel
           previewEstimate={previewEstimate}
           settings={settings}
-          mediaDuration={mediaDuration}
+          mediaDuration={media?.duration ?? null}
         />
       </div>
 
@@ -817,10 +182,8 @@ function App() {
         ref={fileInputRef}
         type="file"
         onChange={(e) => {
-          const selectedFile = e.target.files?.[0]
-          if (selectedFile) {
-            handleFileSelect(selectedFile)
-          }
+          const selected = e.target.files?.[0]
+          if (selected) selectFile(selected)
         }}
         accept="video/*"
         style={{ display: 'none' }}

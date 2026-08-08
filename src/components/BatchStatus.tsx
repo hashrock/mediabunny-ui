@@ -1,18 +1,11 @@
 import type { BatchFileStatus } from '../types'
+import { formatBytes } from '../utils/format'
 
 interface BatchStatusProps {
   files: BatchFileStatus[]
 }
 
 export function BatchStatus({ files }: BatchStatusProps) {
-  const formatSize = (bytes: number) => {
-    if (bytes === 0) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
-  }
-
   const getStatusIcon = (status: BatchFileStatus['status']) => {
     switch (status) {
       case 'pending':
@@ -67,14 +60,14 @@ export function BatchStatus({ files }: BatchStatusProps) {
                   {fileStatus.file.name}
                 </div>
                 <div style={{ fontSize: '12px', color: '#666' }}>
-                  {formatSize(fileStatus.file.size)}
+                  {formatBytes(fileStatus.file.size)}
                 </div>
               </div>
               <div style={{ color: getStatusColor(fileStatus.status), fontWeight: 'bold' }}>
                 {fileStatus.status === 'converting' && `${fileStatus.progress}%`}
                 {fileStatus.status === 'completed' && fileStatus.result && (
                   <span style={{ fontSize: '12px' }}>
-                    → {formatSize(fileStatus.result.convertedSize)}
+                    → {formatBytes(fileStatus.result.convertedSize)}
                   </span>
                 )}
               </div>
