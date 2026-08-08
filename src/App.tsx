@@ -560,7 +560,7 @@ function App() {
             await writable.close()
           } catch (saveError) {
             console.error('Error saving file:', saveError)
-            throw new Error('Failed to save file to disk')
+            throw new Error('Failed to save file to disk', { cause: saveError })
           }
 
           // Update status to completed
