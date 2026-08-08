@@ -1,5 +1,5 @@
 import GIF from 'gif.js'
-import { createAbortError, throwIfAborted } from '../utils/abort'
+import { createAbortError, isAbortError, throwIfAborted } from '../utils/abort'
 import { replaceExtension } from '../utils/format'
 import type { EncodeOptions, EncodedResult } from './types'
 
@@ -7,7 +7,12 @@ export const DEFAULT_GIF_FPS = 10
 
 const GIF_WORKERS = 2
 const GIF_QUALITY = 10
-const GIF_WORKER_SCRIPT = '/gif.worker.js'
+/**
+ * Worker は public/ から配信される。GitHub Pages ではアプリが
+ * サブディレクトリ配下に載る（vite.config.ts の base）ため、
+ * オリジン直下の '/gif.worker.js' では 404 になる。
+ */
+const GIF_WORKER_SCRIPT = `${import.meta.env.BASE_URL}gif.worker.js`
 /** 全体の進捗のうちフレーム抽出が占める割合。残りは GIF のエンコードに使う */
 const FRAME_EXTRACTION_SHARE = 0.8
 
@@ -33,6 +38,8 @@ export async function encodeGif({
   let gif: GIF | null = null
 
   try {
+    // フレーム抽出を始める前に確かめる（抽出後に失敗すると待ち時間が無駄になる）
+    await ensureWorkerScript(signal)
     await waitForMetadata(video, signal)
 
     const start = trim?.start ?? 0
@@ -79,6 +86,29 @@ export async function encodeGif({
     throw err
   } finally {
     URL.revokeObjectURL(objectUrl)
+  }
+}
+
+/**
+ * gif.js は Worker の起動失敗を検知しない（onerror を張っていない）。
+ * そのため Worker を読み込めないと render() が progress 0 を一度出したきり
+ * 無言で止まり、UI が 80% で固まったように見える。
+ * 事前に取得を試して、読めないなら原因の分かるエラーにする。
+ */
+async function ensureWorkerScript(signal?: AbortSignal): Promise<void> {
+  let response: Response
+  try {
+    response = await fetch(GIF_WORKER_SCRIPT, { signal })
+  } catch (err) {
+    if (isAbortError(err)) throw err
+    throw new Error(`GIF encoder worker (${GIF_WORKER_SCRIPT}) could not be loaded`, {
+      cause: err,
+    })
+  }
+  if (!response.ok) {
+    throw new Error(
+      `GIF encoder worker (${GIF_WORKER_SCRIPT}) was not found (HTTP ${response.status})`
+    )
   }
 }
 
