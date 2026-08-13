@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useI18n } from '../i18n/context'
 import type { RefObject } from 'react'
 import type { ConversionResult } from '../types'
 
@@ -41,6 +42,7 @@ export function VideoPreview({
   onDragLeave,
   onDrop,
 }: VideoPreviewProps) {
+  const { t } = useI18n()
   const originalUrl = useMemo(() => URL.createObjectURL(file), [file])
   const previewUrl = useMemo(
     () =>
@@ -73,7 +75,7 @@ export function VideoPreview({
         (isGifResult ? (
           <img
             src={previewUrl}
-            alt="Converted GIF"
+            alt={t.convertedGifAlt}
             className="preview-video preview-video-after"
             style={{
               opacity: showAfter ? 1 : 0,

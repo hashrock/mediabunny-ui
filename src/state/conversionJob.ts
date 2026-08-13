@@ -52,7 +52,7 @@ export function jobResult(state: JobState): ConversionResult | null {
   return state.kind === 'done' ? state.result : null
 }
 
+/** 中断は表示側で文言を決めるため、ここでは失敗した理由だけを返す */
 export function jobErrorMessage(state: JobState): string {
-  if (state.kind === 'error') return state.message
-  return state.kind === 'cancelled' ? 'Conversion cancelled' : ''
+  return state.kind === 'error' ? state.message : ''
 }

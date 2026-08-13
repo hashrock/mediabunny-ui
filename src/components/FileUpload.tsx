@@ -1,4 +1,5 @@
 import { useRef, useCallback } from 'react'
+import { useI18n } from '../i18n/context'
 
 interface FileUploadProps {
   file: File | null
@@ -22,6 +23,7 @@ export function FileUpload({
   onDragLeave,
   onDrop,
 }: FileUploadProps) {
+  const { t } = useI18n()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const batchFileInputRef = useRef<HTMLInputElement>(null)
 
@@ -71,13 +73,13 @@ export function FileUpload({
       />
 
       <div className="drop-content">
-        <div className="drop-message">動画ファイルをここにドロップ</div>
+        <div className="drop-message">{t.dropHere}</div>
         <div className="drop-actions">
           <button className="ghost-btn" onClick={() => fileInputRef.current?.click()}>
-            ファイルを選択
+            {t.selectFile}
           </button>
           <button className="ghost-btn" onClick={() => batchFileInputRef.current?.click()}>
-            複数選択
+            {t.selectFiles}
           </button>
         </div>
       </div>

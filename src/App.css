@@ -67,6 +67,36 @@ body {
   letter-spacing: 0.2px;
 }
 
+.lang-switch {
+  display: flex;
+  margin-left: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.lang-btn {
+  padding: 3px 7px;
+  background: #fff;
+  border: none;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.lang-btn:hover:not(.active) {
+  background: #f5f5f5;
+  color: #000;
+}
+
+.lang-btn.active {
+  background: #000;
+  color: #fff;
+}
+
 .logo {
   width: 28px;
   height: 28px;

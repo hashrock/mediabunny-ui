@@ -1,4 +1,5 @@
 import { useCallback, useReducer, useRef } from 'react'
+import { useI18n } from '../i18n/context'
 import { encode, toConversionResult, toTrim } from '../converters'
 import {
   initialJobState,
@@ -37,6 +38,7 @@ export function useConversionJob({
   settings,
   media,
 }: UseConversionJobOptions): ConversionJob {
+  const { t } = useI18n()
   const [state, dispatch] = useReducer(jobReducer, initialJobState)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -62,12 +64,15 @@ export function useConversionJob({
       // 中断は cancel() 側で状態に反映済みなので、ここでは何もしない
       if (isAbortError(err)) return null
       console.error('Conversion error:', err)
-      dispatch({ type: 'fail', message: err instanceof Error ? err.message : 'Conversion failed' })
+      dispatch({
+        type: 'fail',
+        message: err instanceof Error ? err.message : t.errorConversionFailed,
+      })
       return null
     } finally {
       if (abortRef.current === controller) abortRef.current = null
     }
-  }, [file, settings, media])
+  }, [file, settings, media, t])
 
   const cancel = useCallback(() => {
     abortRef.current?.abort()
@@ -92,7 +97,7 @@ export function useConversionJob({
     running: isJobRunning(state),
     progress: jobProgress(state),
     result,
-    error: jobErrorMessage(state),
+    error: state.kind === 'cancelled' ? t.errorCancelled : jobErrorMessage(state),
     convert,
     cancel,
     reset,

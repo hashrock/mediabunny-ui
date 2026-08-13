@@ -1,4 +1,5 @@
 import { useCallback, useReducer, useRef, useState } from 'react'
+import { useI18n } from '../i18n/context'
 import { encode, toConversionResult } from '../converters'
 import { batchReducer, initialBatchState } from '../state/batchConversion'
 import type { BatchFileStatus, ConversionSettings } from '../types'
@@ -16,6 +17,7 @@ export interface BatchConversion {
 }
 
 export function useBatchConversion(settings: ConversionSettings): BatchConversion {
+  const { t } = useI18n()
   const [files, dispatch] = useReducer(batchReducer, initialBatchState)
   const [running, setRunning] = useState(false)
   const [error, setError] = useState('')
@@ -41,10 +43,10 @@ export function useBatchConversion(settings: ConversionSettings): BatchConversio
     } catch (err) {
       setError(
         isAbortError(err)
-          ? 'Folder selection was cancelled'
+          ? t.errorFolderCancelled
           : err instanceof Error
             ? err.message
-            : 'Failed to select output folder'
+            : t.errorFolderFailed
       )
       return
     }
@@ -76,7 +78,7 @@ export function useBatchConversion(settings: ConversionSettings): BatchConversio
           dispatch({
             type: 'fail',
             index,
-            message: err instanceof Error ? err.message : 'Conversion failed',
+            message: err instanceof Error ? err.message : t.errorConversionFailed,
           })
         }
       }
@@ -84,7 +86,7 @@ export function useBatchConversion(settings: ConversionSettings): BatchConversio
       setRunning(false)
       if (abortRef.current === controller) abortRef.current = null
     }
-  }, [files, settings])
+  }, [files, settings, t])
 
   const cancel = useCallback(() => {
     abortRef.current?.abort()

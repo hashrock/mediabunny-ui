@@ -1,5 +1,6 @@
 import type { RefObject } from 'react'
 import { useVideoPlayback } from '../hooks/useVideoPlayback'
+import { useI18n } from '../i18n/context'
 import type { ConversionResult, ConversionSettings } from '../types'
 import { formatBytes, formatTimecode } from '../utils/format'
 import { TimeField } from './TimeField'
@@ -42,6 +43,7 @@ export function BottomBar({
   onCancel,
   onDownload,
 }: BottomBarProps) {
+  const { t } = useI18n()
   const start = settings.startTime ?? 0
   const end = settings.endTime ?? duration
   const hasTimeline = duration > 0
@@ -89,8 +91,8 @@ export function BottomBar({
           <button
             className="transport-btn"
             onClick={togglePlay}
-            title={playback.playing ? 'Pause' : 'Play'}
-            aria-label={playback.playing ? 'Pause' : 'Play'}
+            title={playback.playing ? t.pause : t.play}
+            aria-label={playback.playing ? t.pause : t.play}
           >
             {playback.playing ? '❚❚' : '▶'}
           </button>
@@ -108,7 +110,7 @@ export function BottomBar({
             onSeek={seek}
           />
 
-          <span className="trim-length" title="Trimmed length">
+          <span className="trim-length" title={t.trimmedLength}>
             {formatTimecode(Math.max(0, end - start))}
           </span>
         </div>
@@ -118,7 +120,7 @@ export function BottomBar({
         {hasTimeline && (
           <div className="trim-fields">
             <TimeField
-              label="In"
+              label={t.trimIn}
               value={start}
               min={0}
               max={Math.max(0, end - 0.1)}
@@ -127,13 +129,13 @@ export function BottomBar({
             <button
               className="ghost-btn"
               onClick={() => setTrim({ start: Math.min(playback.currentTime, end - 0.1), end })}
-              title="Set trim start to the current position"
+              title={t.setInTitle}
             >
-              ⇤ 現在位置
+              {t.setInToPlayhead}
             </button>
 
             <TimeField
-              label="Out"
+              label={t.trimOut}
               value={end}
               min={Math.min(duration, start + 0.1)}
               max={duration}
@@ -142,18 +144,18 @@ export function BottomBar({
             <button
               className="ghost-btn"
               onClick={() => setTrim({ start, end: Math.max(playback.currentTime, start + 0.1) })}
-              title="Set trim end to the current position"
+              title={t.setOutTitle}
             >
-              現在位置 ⇥
+              {t.setOutToPlayhead}
             </button>
 
             <button
               className="ghost-btn"
               onClick={() => setTrim({ start: 0, end: duration })}
               disabled={start === 0 && end === duration}
-              title="Use the whole clip"
+              title={t.wholeClipTitle}
             >
-              全体
+              {t.wholeClip}
             </button>
           </div>
         )}
@@ -166,7 +168,7 @@ export function BottomBar({
               </div>
               <span className="inline-progress-text">{progress}%</span>
               <button className="cancel-btn" onClick={onCancel}>
-                Cancel
+                {t.cancel}
               </button>
             </>
           )}
@@ -178,13 +180,13 @@ export function BottomBar({
                   className={`toggle-btn ${!showAfter ? 'active' : ''}`}
                   onClick={() => onToggleView(false)}
                 >
-                  Before <span className="size-badge">{formatBytes(result.originalSize)}</span>
+                  {t.before} <span className="size-badge">{formatBytes(result.originalSize)}</span>
                 </button>
                 <button
                   className={`toggle-btn ${showAfter ? 'active' : ''}`}
                   onClick={() => onToggleView(true)}
                 >
-                  After <span className="size-badge">{formatBytes(result.convertedSize)}</span>
+                  {t.after} <span className="size-badge">{formatBytes(result.convertedSize)}</span>
                   <span className={`compression-badge ${compressionRatio < 0 ? 'negative' : ''}`}>
                     {compressionDisplay}
                   </span>
@@ -194,12 +196,12 @@ export function BottomBar({
               <button
                 className={`reconvert-btn ${stale ? 'stale' : ''}`}
                 onClick={onConvert}
-                title={stale ? 'Settings changed since the last conversion' : 'Convert again'}
+                title={stale ? t.reconvertTitleStale : t.reconvertTitle}
               >
-                {stale ? '● 再変換' : '再変換'}
+                {stale ? `● ${t.reconvert}` : t.reconvert}
               </button>
               <button className="download-btn" onClick={onDownload}>
-                Download
+                {t.download}
               </button>
             </>
           )}
