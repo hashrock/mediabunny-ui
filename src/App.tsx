@@ -1,9 +1,9 @@
 import { useCallback, useRef, useState } from 'react'
 import './App.css'
 import { BatchStatus } from './components/BatchStatus'
-import { ConversionControls } from './components/ConversionControls'
+import { BottomBar } from './components/BottomBar'
 import { FileUpload } from './components/FileUpload'
-import { UploadCompatibilityPanel } from './components/UploadCompatibilityPanel'
+import { Sidebar } from './components/Sidebar'
 import { VideoPreview } from './components/VideoPreview'
 import { probeMedia } from './converters'
 import { useBatchConversion } from './hooks/useBatchConversion'
@@ -16,13 +16,27 @@ const DEFAULT_SETTINGS: ConversionSettings = {
   quality: 80,
 }
 
+/** 変換結果がいまの設定で作られたものかを比べるための鍵 */
+function settingsKey(settings: ConversionSettings): string {
+  return [
+    settings.format,
+    settings.quality,
+    settings.width ?? '',
+    settings.height ?? '',
+    settings.fps ?? '',
+    settings.startTime ?? '',
+    settings.endTime ?? '',
+  ].join('|')
+}
+
 function App() {
   const [file, setFile] = useState<File | null>(null)
   const [media, setMedia] = useState<MediaInfo | null>(null)
   const [settings, setSettings] = useState<ConversionSettings>(DEFAULT_SETTINGS)
   const [isDragging, setIsDragging] = useState(false)
   const [showAfter, setShowAfter] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [convertedKey, setConvertedKey] = useState<string | null>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   const job = useConversionJob({ file, settings, media })
   const batch = useBatchConversion(settings)
@@ -33,10 +47,15 @@ function App() {
   const { clear: clearBatch, setFiles: setBatchFiles } = batch
 
   const converting = job.running || batch.running
+  // 変換したあとに設定を触ったか。再変換ボタンで示す
+  const stale = !!job.result && convertedKey !== settingsKey(settings)
 
   const handleConvert = async () => {
     // 変換できたら結果側に切り替える（その後の手動切り替えは妨げない）
-    if (await job.convert()) setShowAfter(true)
+    if (await job.convert()) {
+      setConvertedKey(settingsKey(settings))
+      setShowAfter(true)
+    }
   }
 
   const selectFile = useCallback(
@@ -44,6 +63,7 @@ function App() {
       setFile(selected)
       setMedia(null)
       setShowAfter(false)
+      setConvertedKey(null)
       resetJob()
       clearBatch()
 
@@ -63,6 +83,7 @@ function App() {
       setFile(null)
       setMedia(null)
       setShowAfter(false)
+      setConvertedKey(null)
       resetJob()
       setBatchFiles(selected)
     },
@@ -99,46 +120,34 @@ function App() {
     else job.cancel()
   }
 
-  const handleReset = () => setSettings(DEFAULT_SETTINGS)
-
-  const isVideo = file?.type.startsWith('video/') ?? false
+  // 尺に依存する切り出し区間は、いま開いているファイルに合わせて残す
+  const handleResetSettings = () =>
+    setSettings({ ...DEFAULT_SETTINGS, startTime: 0, endTime: media?.duration })
 
   return (
     <div className="app">
-      <div className="file-header">
-        <div className="file-header-content">
-          <div className="logo">
-            <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M39.6018 86.2478C2.00431 94.9039 6.19952 53.9469 23.7246 50.4125C32.6017 48.6222 14.5781 14.1139 32.1539 13.0413C46.2146 12.1833 36.3339 44.8067 48.6748 46.0905C61.0157 47.3744 46.8788 10.5945 64.7008 11.9515C82.5229 13.3084 68.4816 44.7593 76.8022 52.4154C97 71.0001 71.7956 98.756 61 86.2478C53.3734 77.4113 69 57.5 87 93" stroke="#8E6F70" strokeWidth="9" strokeLinecap="round"/>
-            </svg>
-          </div>
-          <span className="filename">{file ? file.name : 'No file selected'}</span>
-          <button className="select-file-btn" onClick={() => fileInputRef.current?.click()}>
-            Select File
-          </button>
-        </div>
-      </div>
-
-      <ConversionControls
+      <Sidebar
+        file={file}
+        media={media}
+        batchFileCount={batch.files.length}
         settings={settings}
         onSettingsChange={setSettings}
-        onConvert={handleConvert}
-        onBatchConvert={batch.run}
-        onReset={handleReset}
-        onDownload={job.download}
-        onCancel={handleCancel}
+        onFileSelect={selectFile}
+        onFilesSelect={selectFiles}
+        onResetSettings={handleResetSettings}
+        previewEstimate={previewEstimate}
         converting={converting}
         progress={job.progress}
         hasResult={!!job.result}
-        isVideo={isVideo}
-        mediaDuration={media?.duration ?? null}
-        previewEstimate={previewEstimate}
-        hasFile={!!file}
-        hasBatchFiles={batch.files.length > 0}
+        stale={stale}
+        onConvert={handleConvert}
+        onBatchConvert={batch.run}
+        onCancel={handleCancel}
+        onDownload={job.download}
       />
 
-      <div className="app-body">
-        <div className="main-content">
+      <div className="workspace">
+        <div className="stage">
           <FileUpload
             file={file}
             files={batch.files.map((item) => item.file)}
@@ -150,18 +159,14 @@ function App() {
             onDrop={handleDrop}
           />
 
-          {batch.error && <div className="error-message">{batch.error}</div>}
-          {batch.files.length > 0 && <BatchStatus files={batch.files} />}
-
           {file && (
             <VideoPreview
               file={file}
-              media={media}
+              videoRef={videoRef}
               result={job.result}
               converting={job.running}
               progress={job.progress}
               showAfter={showAfter}
-              onToggleView={setShowAfter}
               error={job.error}
               isDragging={isDragging}
               onDragOver={handleDragOver}
@@ -169,25 +174,34 @@ function App() {
               onDrop={handleDrop}
             />
           )}
+
+          {batch.files.length > 0 && (
+            <div className="batch-area">
+              {batch.error && <div className="batch-error">{batch.error}</div>}
+              <BatchStatus files={batch.files} />
+            </div>
+          )}
         </div>
 
-        <UploadCompatibilityPanel
-          previewEstimate={previewEstimate}
-          settings={settings}
-          mediaDuration={media?.duration ?? null}
-        />
+        {file && (
+          <BottomBar
+            file={file}
+            videoRef={videoRef}
+            duration={media?.duration ?? 0}
+            settings={settings}
+            onSettingsChange={setSettings}
+            result={job.result}
+            showAfter={showAfter}
+            onToggleView={setShowAfter}
+            converting={job.running}
+            progress={job.progress}
+            stale={stale}
+            onConvert={handleConvert}
+            onCancel={handleCancel}
+            onDownload={job.download}
+          />
+        )}
       </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        onChange={(e) => {
-          const selected = e.target.files?.[0]
-          if (selected) selectFile(selected)
-        }}
-        accept="video/*"
-        style={{ display: 'none' }}
-      />
     </div>
   )
 }

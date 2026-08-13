@@ -11,6 +11,7 @@ interface FileUploadProps {
   onDrop: (e: React.DragEvent) => void
 }
 
+/** 何も読み込んでいないときのドロップ領域 */
 export function FileUpload({
   file,
   files,
@@ -44,8 +45,15 @@ export function FileUpload({
     [onFilesSelect]
   )
 
+  if (file || files.length > 0) return null
+
   return (
-    <>
+    <div
+      className={`preview-area drop-zone ${isDragging ? 'dragging' : ''}`}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
       <input
         ref={fileInputRef}
         type="file"
@@ -62,32 +70,17 @@ export function FileUpload({
         style={{ display: 'none' }}
       />
 
-      {!file && files.length === 0 && (
-        <div
-          className={`preview-area ${isDragging ? 'dragging' : ''}`}
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          onDrop={onDrop}
-        >
-          <div className="drop-content">
-            <div className="drop-message">Drop video file(s) here</div>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                className="select-file-btn"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                Select File
-              </button>
-              <button
-                className="select-file-btn"
-                onClick={() => batchFileInputRef.current?.click()}
-              >
-                Select Multiple Files
-              </button>
-            </div>
-          </div>
+      <div className="drop-content">
+        <div className="drop-message">動画ファイルをここにドロップ</div>
+        <div className="drop-actions">
+          <button className="ghost-btn" onClick={() => fileInputRef.current?.click()}>
+            ファイルを選択
+          </button>
+          <button className="ghost-btn" onClick={() => batchFileInputRef.current?.click()}>
+            複数選択
+          </button>
         </div>
-      )}
-    </>
+      </div>
+    </div>
   )
 }
