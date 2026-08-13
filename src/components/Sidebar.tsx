@@ -1,4 +1,7 @@
 import { useRef, useState } from 'react'
+import { useI18n } from '../i18n/context'
+import { LANGS } from '../i18n/messages'
+import type { Messages } from '../i18n/messages'
 import type { ConversionSettings, MediaInfo, OutputFormat, PreviewEstimate } from '../types'
 import { formatBytes, formatTimecode } from '../utils/format'
 import { CompatibilityList } from './CompatibilityList'
@@ -23,10 +26,15 @@ interface SidebarProps {
   onDownload: () => void
 }
 
-const FORMATS: { value: OutputFormat; label: string; hint: string }[] = [
-  { value: 'mp4', label: 'MP4', hint: 'H.264 / 汎用' },
-  { value: 'webm', label: 'WebM', hint: 'VP9 / Web 向け' },
-  { value: 'gif', label: 'GIF', hint: 'ループ画像' },
+/** 文言のうち、そのまま表示できる（引数を取らない）ものの名前 */
+type TextKey = {
+  [K in keyof Messages]: Messages[K] extends string ? K : never
+}[keyof Messages]
+
+const FORMATS: { value: OutputFormat; label: string; hint: TextKey }[] = [
+  { value: 'mp4', label: 'MP4', hint: 'formatHintMp4' },
+  { value: 'webm', label: 'WebM', hint: 'formatHintWebm' },
+  { value: 'gif', label: 'GIF', hint: 'formatHintGif' },
 ]
 
 /** 縦に並べる解像度プリセット（高さ基準） */
@@ -76,11 +84,13 @@ export function Sidebar({
   onCancel,
   onDownload,
 }: SidebarProps) {
+  const { t, lang, setLang } = useI18n()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const batchInputRef = useRef<HTMLInputElement>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
 
   const dimensions = media?.dimensions ?? null
+  const currentFormat = FORMATS.find((format) => format.value === settings.format)
   const trimmedDuration =
     (settings.endTime ?? media?.duration ?? 0) - (settings.startTime ?? 0)
 
@@ -104,10 +114,23 @@ export function Sidebar({
           </svg>
         </div>
         <span className="app-name">mediabunny</span>
+        <div className="lang-switch">
+          {LANGS.map((value) => (
+            <button
+              key={value}
+              className={`lang-btn ${lang === value ? 'active' : ''}`}
+              onClick={() => setLang(value)}
+              title={t.langLabel[value]}
+              aria-pressed={lang === value}
+            >
+              {value.toUpperCase()}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="sidebar-scroll">
-        <Step index={1} title="入力">
+        <Step index={1} title={t.stepInput}>
           <input
             ref={fileInputRef}
             type="file"
@@ -139,12 +162,12 @@ export function Sidebar({
               </div>
               <dl className="source-facts">
                 <div>
-                  <dt>サイズ</dt>
+                  <dt>{t.factSize}</dt>
                   <dd>{formatBytes(file.size)}</dd>
                 </div>
                 {dimensions && (
                   <div>
-                    <dt>解像度</dt>
+                    <dt>{t.factResolution}</dt>
                     <dd>
                       {dimensions.width}×{dimensions.height}
                     </dd>
@@ -152,71 +175,71 @@ export function Sidebar({
                 )}
                 {media && (
                   <div>
-                    <dt>長さ</dt>
+                    <dt>{t.factDuration}</dt>
                     <dd>{formatTimecode(media.duration)}</dd>
                   </div>
                 )}
               </dl>
 
               <button className="disclosure" onClick={() => setDetailsOpen(!detailsOpen)}>
-                {detailsOpen ? '▼' : '▶'} 詳細
+                {detailsOpen ? '▼' : '▶'} {t.details}
               </button>
               {detailsOpen && (
                 <dl className="source-facts source-facts-detail">
                   <div>
-                    <dt>MIME</dt>
+                    <dt>{t.factMime}</dt>
                     <dd>{file.type || 'unknown'}</dd>
                   </div>
                   {media?.videoCodec && (
                     <div>
-                      <dt>映像</dt>
+                      <dt>{t.factVideoCodec}</dt>
                       <dd>{media.videoCodec}</dd>
                     </div>
                   )}
                   {media?.audioCodec && (
                     <div>
-                      <dt>音声</dt>
+                      <dt>{t.factAudioCodec}</dt>
                       <dd>{media.audioCodec}</dd>
                     </div>
                   )}
                   {media?.tags?.title && (
                     <div>
-                      <dt>タイトル</dt>
+                      <dt>{t.factTitle}</dt>
                       <dd>{media.tags.title}</dd>
                     </div>
                   )}
                   {media?.tags?.artist && (
                     <div>
-                      <dt>作成者</dt>
+                      <dt>{t.factArtist}</dt>
                       <dd>{media.tags.artist}</dd>
                     </div>
                   )}
                   <div>
-                    <dt>更新日時</dt>
-                    <dd>{new Date(file.lastModified).toLocaleString()}</dd>
+                    <dt>{t.factModified}</dt>
+                    <dd>{new Date(file.lastModified).toLocaleString(lang)}</dd>
                   </div>
                 </dl>
               )}
             </div>
           ) : batchFileCount > 0 ? (
             <div className="source">
-              <div className="source-name">{batchFileCount} ファイルを一括変換</div>
+              <div className="source-name">{t.batchSelected(batchFileCount)}</div>
             </div>
           ) : (
-            <p className="step-empty">ファイルをドロップするか、下のボタンから選択します。</p>
+            <p className="step-empty">{t.inputEmpty}</p>
           )}
 
           <div className="step-actions">
             <button className="ghost-btn" onClick={() => fileInputRef.current?.click()}>
-              ファイルを選択
+              {t.selectFile}
             </button>
             <button className="ghost-btn" onClick={() => batchInputRef.current?.click()}>
-              複数選択
+              {t.selectFiles}
             </button>
           </div>
         </Step>
 
-        <Step index={2} title="出力形式">
+        <Step index={2} title={t.stepFormat}>
           <div className="segmented">
             {FORMATS.map((format) => (
               <button
@@ -234,16 +257,14 @@ export function Sidebar({
               </button>
             ))}
           </div>
-          <p className="step-hint">
-            {FORMATS.find((format) => format.value === settings.format)?.hint}
-          </p>
+          {currentFormat && <p className="step-hint">{t[currentFormat.hint]}</p>}
         </Step>
 
-        <Step index={3} title={settings.format === 'gif' ? 'フレームレート' : '画質'}>
+        <Step index={3} title={settings.format === 'gif' ? t.stepFps : t.stepQuality}>
           {settings.format === 'gif' ? (
             <div className="field">
               <div className="field-head">
-                <span>FPS</span>
+                <span>{t.fpsLabel}</span>
                 <span className="field-value">{settings.fps ?? 10}</span>
               </div>
               <input
@@ -253,12 +274,12 @@ export function Sidebar({
                 value={settings.fps ?? 10}
                 onChange={(e) => onSettingsChange({ ...settings, fps: Number(e.target.value) })}
               />
-              <p className="step-hint">下げるほど軽くなり、上げるほど滑らかになります。</p>
+              <p className="step-hint">{t.fpsHint}</p>
             </div>
           ) : (
             <div className="field">
               <div className="field-head">
-                <span>Quality</span>
+                <span>{t.qualityLabel}</span>
                 <span className="field-value">{settings.quality}%</span>
               </div>
               <input
@@ -268,12 +289,12 @@ export function Sidebar({
                 value={settings.quality}
                 onChange={(e) => onSettingsChange({ ...settings, quality: Number(e.target.value) })}
               />
-              <p className="step-hint">ビットレートの目安です。下げるとサイズが小さくなります。</p>
+              <p className="step-hint">{t.qualityHint}</p>
             </div>
           )}
         </Step>
 
-        <Step index={4} title="解像度">
+        <Step index={4} title={t.stepResolution}>
           {dimensions && (
             <div className="preset-row">
               <button
@@ -282,7 +303,7 @@ export function Sidebar({
                   onSettingsChange({ ...settings, width: undefined, height: undefined })
                 }
               >
-                原寸
+                {t.originalSize}
               </button>
               {HEIGHT_PRESETS.filter((height) => height < dimensions.height).map((height) => (
                 <button
@@ -297,10 +318,10 @@ export function Sidebar({
           )}
           <div className="dimension-row">
             <label className="dimension-field">
-              <span>幅</span>
+              <span>{t.width}</span>
               <input
                 type="number"
-                placeholder="Auto"
+                placeholder={t.auto}
                 value={settings.width || ''}
                 onChange={(e) =>
                   onSettingsChange({
@@ -312,10 +333,10 @@ export function Sidebar({
             </label>
             <span className="dimension-times">×</span>
             <label className="dimension-field">
-              <span>高さ</span>
+              <span>{t.height}</span>
               <input
                 type="number"
-                placeholder="Auto"
+                placeholder={t.auto}
                 value={settings.height || ''}
                 onChange={(e) =>
                   onSettingsChange({
@@ -328,20 +349,20 @@ export function Sidebar({
           </div>
         </Step>
 
-        <Step index={5} title="出力の見込み">
+        <Step index={5} title={t.stepEstimate}>
           <div className="estimate">
             <div className="estimate-row">
-              <span>推定サイズ</span>
+              <span>{t.estimatedSize}</span>
               <strong>
                 {previewEstimate.isEstimating
-                  ? '計算中…'
+                  ? t.estimating
                   : previewEstimate.estimatedSize > 0
                     ? formatBytes(previewEstimate.estimatedSize)
                     : '—'}
               </strong>
             </div>
             <div className="estimate-row">
-              <span>長さ</span>
+              <span>{t.outputDuration}</span>
               <strong>{trimmedDuration > 0 ? formatTimecode(trimmedDuration) : '—'}</strong>
             </div>
           </div>
@@ -352,12 +373,12 @@ export function Sidebar({
               duration={trimmedDuration}
             />
           ) : (
-            <p className="step-hint">ファイルを選ぶと、投稿先ごとの上限と照らし合わせます。</p>
+            <p className="step-hint">{t.estimateEmpty}</p>
           )}
         </Step>
 
         <button className="link-btn" onClick={onResetSettings}>
-          設定を初期値に戻す
+          {t.resetSettings}
         </button>
       </div>
 
@@ -368,23 +389,23 @@ export function Sidebar({
               <div className="footer-progress-bar" style={{ width: `${progress}%` }} />
             </div>
             <button className="cancel-btn block" onClick={onCancel}>
-              変換を中止（{progress}%）
+              {t.cancelWithProgress(progress)}
             </button>
           </>
         ) : (
           <>
             {batchFileCount > 0 ? (
               <button className="convert-btn block" onClick={onBatchConvert}>
-                {batchFileCount} ファイルを変換
+                {t.convertBatch(batchFileCount)}
               </button>
             ) : (
               <button className="convert-btn block" onClick={onConvert} disabled={!file}>
-                {hasResult ? (stale ? '再変換する' : 'もう一度変換') : '変換する'}
+                {hasResult ? (stale ? t.reconvertLong : t.convertAgain) : t.convert}
               </button>
             )}
             {hasResult && (
               <button className="download-btn block" onClick={onDownload}>
-                ダウンロード
+                {t.download}
               </button>
             )}
           </>

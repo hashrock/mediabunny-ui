@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useI18n } from '../i18n/context'
 
 interface TimelineProps {
   duration: number
@@ -29,6 +30,7 @@ export function Timeline({
   onTrimChange,
   onSeek,
 }: TimelineProps) {
+  const { t } = useI18n()
   const trackRef = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState<DragTarget | null>(null)
 
@@ -103,7 +105,7 @@ export function Timeline({
           style={{ left: percent(start, duration) }}
           onPointerDown={beginDrag('start')}
           role="slider"
-          aria-label="Trim start"
+          aria-label={t.trimStartHandle}
           aria-valuemin={0}
           aria-valuemax={duration}
           aria-valuenow={start}
@@ -114,7 +116,7 @@ export function Timeline({
           style={{ left: percent(end, duration) }}
           onPointerDown={beginDrag('end')}
           role="slider"
-          aria-label="Trim end"
+          aria-label={t.trimEndHandle}
           aria-valuemin={0}
           aria-valuemax={duration}
           aria-valuenow={end}

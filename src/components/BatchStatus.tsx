@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/context'
 import type { BatchFileStatus } from '../types'
 import { formatBytes } from '../utils/format'
 
@@ -6,6 +7,7 @@ interface BatchStatusProps {
 }
 
 export function BatchStatus({ files }: BatchStatusProps) {
+  const { t } = useI18n()
   const getStatusIcon = (status: BatchFileStatus['status']) => {
     switch (status) {
       case 'pending':
@@ -37,10 +39,7 @@ export function BatchStatus({ files }: BatchStatusProps) {
 
   return (
     <div style={{ marginTop: '20px', padding: '15px', border: '1px solid #ddd', borderRadius: '8px' }}>
-      <h3 style={{ marginTop: 0 }}>
-        Batch Conversion Status ({completedCount}/{files.length} completed
-        {errorCount > 0 && `, ${errorCount} errors`})
-      </h3>
+      <h3 style={{ marginTop: 0 }}>{t.batchStatus(completedCount, files.length, errorCount)}</h3>
       <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
         {files.map((fileStatus, index) => (
           <div

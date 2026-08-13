@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useI18n } from '../i18n/context'
 import serviceLimits from '../serviceLimits.json'
 import { formatBytes } from '../utils/format'
 
@@ -35,6 +36,7 @@ function checkServices(estimatedSize: number, duration: number) {
  * ふだんは合否の数だけを出し、内訳はサービスごとに開いて確かめる。
  */
 export function CompatibilityList({ estimatedSize, duration }: CompatibilityListProps) {
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const [openService, setOpenService] = useState<string | null>(null)
 
@@ -45,7 +47,7 @@ export function CompatibilityList({ estimatedSize, duration }: CompatibilityList
     <div className="compat">
       <button className="compat-summary" onClick={() => setOpen(!open)}>
         <span className="compat-caret">{open ? '▼' : '▶'}</span>
-        <span className="compat-summary-label">投稿先チェック</span>
+        <span className="compat-summary-label">{t.compatTitle}</span>
         <span className="compat-count">
           {okCount}/{services.length}
         </span>
@@ -73,7 +75,7 @@ export function CompatibilityList({ estimatedSize, duration }: CompatibilityList
                   <span className={`compat-dot ${service.compatible ? 'ok' : 'ng'}`} />
                   <span className="compat-service-name">{service.name}</span>
                   <span className="compat-service-note">
-                    {service.passingTier ?? '上限超過'}
+                    {service.passingTier ?? t.compatExceeded}
                   </span>
                   <span className="compat-caret">{expanded ? '▼' : '▶'}</span>
                 </button>
