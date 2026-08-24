@@ -6,9 +6,9 @@
       "limits": [
         {
           "tier": "Free",
-          "maxSize": 10485760,
-          "maxSizeMB": 10,
-          "notes": "Reduced from 25MB in September 2024"
+          "maxSize": 20971520,
+          "maxSizeMB": 20,
+          "notes": "Increased from 10MB in August 2026"
         },
         {
           "tier": "Nitro Basic",
