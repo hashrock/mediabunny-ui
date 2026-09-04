@@ -1,8 +1,11 @@
-const UNITS = ['B', 'KB', 'MB', 'GB']
+export const UNITS = ['B', 'KB', 'MB', 'GB']
 
 export function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), UNITS.length - 1)
+  // 0・負値・NaN はまとめて 0 B に倒す（表示に NaN を出さない）
+  if (!(bytes > 0)) return '0 B'
+  // 1 バイト未満だと指数が負になり、単位が UNITS の範囲外になってしまう
+  const rawExponent = Math.floor(Math.log(bytes) / Math.log(1024))
+  const exponent = Math.min(Math.max(rawExponent, 0), UNITS.length - 1)
   const value = bytes / Math.pow(1024, exponent)
   return `${Math.round(value * 100) / 100} ${UNITS[exponent]}`
 }
@@ -17,10 +20,12 @@ export function formatDuration(seconds: number): string {
 
 /** 秒数を mm:ss.s（1時間以上なら h:mm:ss.s）形式にする。トリム入力の表示用 */
 export function formatTimecode(seconds: number): string {
-  const clamped = Math.max(0, seconds)
-  const h = Math.floor(clamped / 3600)
-  const m = Math.floor((clamped % 3600) / 60)
-  const s = clamped % 60
+  // 先に 0.1 秒へ丸めてから桁を分ける。
+  // 秒だけを個別に丸めると 59.97 秒が 60.0 秒として桁上がりせずに残ってしまう。
+  const deciseconds = Math.round(Math.max(0, seconds) * 10)
+  const h = Math.floor(deciseconds / 36000)
+  const m = Math.floor((deciseconds % 36000) / 600)
+  const s = (deciseconds % 600) / 10
   const ss = s.toFixed(1).padStart(4, '0')
   return h > 0
     ? `${h}:${String(m).padStart(2, '0')}:${ss}`
