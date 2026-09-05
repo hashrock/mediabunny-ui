@@ -58,12 +58,23 @@ describe('jobReducer', () => {
     )
   })
 
-  test('走っていないときの進捗は状態をまったく動かさない（中断後に遅れて届いても巻き戻らない）', () => {
+  test('進捗で状態が作り直されるのは、走行中に値が動いたときだけ', () => {
     fc.assert(
       fc.property(actionSequence, progressValue, (actions, value) => {
         const state = reachable(actions)
-        fc.pre(state.kind !== 'running')
-        expect(jobReducer(state, { type: 'progress', value })).toBe(state)
+        const moves = state.kind === 'running' && state.progress !== value
+        // 中断後に遅れて届いた進捗も、同じ値の繰り返しも、描き直しを起こさない
+        expect(jobReducer(state, { type: 'progress', value }) === state).toBe(!moves)
+      })
+    )
+  })
+
+  test('同じ進捗を続けて受けても、2 回目は状態を作り直さない', () => {
+    fc.assert(
+      fc.property(actionSequence, progressValue, (actions, value) => {
+        const started = jobReducer(reachable(actions), { type: 'start' })
+        const once = jobReducer(started, { type: 'progress', value })
+        expect(jobReducer(once, { type: 'progress', value })).toBe(once)
       })
     )
   })

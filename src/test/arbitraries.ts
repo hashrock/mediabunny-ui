@@ -41,3 +41,8 @@ export function reachableTrim(duration: number, actions: TrimAction[]): Trim {
     { start: 0, end: duration }
   )
 }
+
+/** 画面の操作で実際に作れる区間と、その尺 */
+export const trimWithDuration = fc
+  .tuple(trimmableDuration, trimActionSequence)
+  .map(([duration, actions]) => ({ duration, trim: reachableTrim(duration, actions) }))

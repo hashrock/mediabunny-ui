@@ -26,8 +26,11 @@ export function jobReducer(state: JobState, action: JobAction): JobState {
     case 'start':
       return { kind: 'running', progress: 0 }
     case 'progress':
-      // 中断後に遅れて届いた進捗で状態を巻き戻さない
-      return state.kind === 'running' ? { kind: 'running', progress: action.value } : state
+      // 中断後に遅れて届いた進捗で状態を巻き戻さない。
+      // エンコーダはフレームごとに進捗を返すので、同じ百分率の繰り返しでも作り直さない
+      return state.kind === 'running' && state.progress !== action.value
+        ? { kind: 'running', progress: action.value }
+        : state
     case 'done':
       return { kind: 'done', result: action.result }
     case 'fail':

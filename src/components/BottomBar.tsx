@@ -1,7 +1,7 @@
 import type { RefObject } from 'react'
 import { useVideoPlayback } from '../hooks/useVideoPlayback'
 import { useI18n } from '../i18n/context'
-import { applyTrim, isWholeClip } from '../state/trim'
+import { applyTrim, isWholeClip, trimDuration, trimFromSettings } from '../state/trim'
 import type { TrimAction } from '../state/trim'
 import type { ConversionResult, ConversionSettings, Trim } from '../types'
 import { formatBytes, formatTimecode } from '../utils/format'
@@ -46,9 +46,8 @@ export function BottomBar({
   onDownload,
 }: BottomBarProps) {
   const { t } = useI18n()
-  const start = settings.startTime ?? 0
-  const end = settings.endTime ?? duration
-  const trim: Trim = { start, end }
+  const trim = trimFromSettings(settings, duration)
+  const { start, end } = trim
   const hasTimeline = duration > 0
 
   const playback = useVideoPlayback({ videoRef, file, trim: hasTimeline ? trim : null })
@@ -111,7 +110,7 @@ export function BottomBar({
           />
 
           <span className="trim-length" title={t.trimmedLength}>
-            {formatTimecode(Math.max(0, end - start))}
+            {formatTimecode(trimDuration(trim))}
           </span>
         </div>
       )}

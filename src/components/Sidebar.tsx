@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useI18n } from '../i18n/context'
 import { LANGS } from '../i18n/messages'
 import type { Messages } from '../i18n/messages'
+import { trimDuration, trimFromSettings } from '../state/trim'
 import type { ConversionSettings, MediaInfo, OutputFormat, PreviewEstimate } from '../types'
 import { formatBytes, formatTimecode } from '../utils/format'
 import { CompatibilityList } from './CompatibilityList'
@@ -91,8 +92,7 @@ export function Sidebar({
 
   const dimensions = media?.dimensions ?? null
   const currentFormat = FORMATS.find((format) => format.value === settings.format)
-  const trimmedDuration =
-    (settings.endTime ?? media?.duration ?? 0) - (settings.startTime ?? 0)
+  const trimmedDuration = trimDuration(trimFromSettings(settings, media?.duration ?? 0))
 
   const applyHeightPreset = (height: number) => {
     if (!dimensions) return

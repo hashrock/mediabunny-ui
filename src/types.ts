@@ -24,13 +24,22 @@ export interface PreviewEstimate {
   isEstimating: boolean
 }
 
-export interface BatchFileStatus {
+interface BatchFileBase {
   file: File
-  status: 'pending' | 'converting' | 'completed' | 'error'
+  /** 変換の進み具合（0〜100） */
   progress: number
-  result?: ConversionResult
-  error?: string
 }
+
+/**
+ * バッチ変換 1 件の状態。取りうる形をユニオンで閉じているので
+ * 「失敗したのに結果がある」といった組み合わせは表現できない。
+ * 出力そのものは書き出し先へ保存済みなので、ここには表示に使う大きさだけを残す。
+ */
+export type BatchFileStatus =
+  | (BatchFileBase & { status: 'pending' })
+  | (BatchFileBase & { status: 'converting' })
+  | (BatchFileBase & { status: 'completed'; convertedSize: number })
+  | (BatchFileBase & { status: 'error'; error: string })
 
 /** 入力ファイルから読み取ったメディア情報。常にまとめて取得・破棄する */
 export interface MediaInfo {
