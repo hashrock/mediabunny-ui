@@ -10,6 +10,5 @@ export function encode(options: EncodeOptions): Promise<EncodedResult> {
 export { DEFAULT_GIF_FPS } from './encodeGif'
 export { estimateOutputSize } from './estimate'
 export { probeMedia } from './probe'
-export { toTrim } from './trim'
 export { toConversionResult } from './types'
 export type { EncodeOptions, EncodedResult } from './types'

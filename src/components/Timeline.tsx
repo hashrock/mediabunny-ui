@@ -1,19 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useI18n } from '../i18n/context'
+import { applyTrim } from '../state/trim'
+import type { Trim } from '../types'
 
 interface TimelineProps {
   duration: number
-  start: number
-  end: number
+  trim: Trim
   currentTime: number
-  onTrimChange: (trim: { start: number; end: number }) => void
+  onTrimChange: (trim: Trim) => void
   onSeek: (time: number) => void
 }
 
 type DragTarget = 'start' | 'end' | 'playhead'
-
-/** これ以上は詰められない区間の長さ（秒） */
-const MIN_RANGE = 0.1
 
 const percent = (value: number, duration: number) =>
   duration > 0 ? `${(value / duration) * 100}%` : '0%'
@@ -22,15 +20,9 @@ const percent = (value: number, duration: number) =>
  * トリム区間と再生位置をドラッグで操作するタイムライン。
  * ハンドルを動かすと再生位置もそこへ飛ぶので、切り出し位置をその場で確認できる。
  */
-export function Timeline({
-  duration,
-  start,
-  end,
-  currentTime,
-  onTrimChange,
-  onSeek,
-}: TimelineProps) {
+export function Timeline({ duration, trim, currentTime, onTrimChange, onSeek }: TimelineProps) {
   const { t } = useI18n()
+  const { start, end } = trim
   const trackRef = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState<DragTarget | null>(null)
 
@@ -50,15 +42,15 @@ export function Timeline({
         onSeek(time)
         return
       }
-      if (target === 'start') {
-        const next = Math.min(time, end - MIN_RANGE)
-        onTrimChange({ start: Math.max(0, next), end })
-        onSeek(Math.max(0, next))
-        return
-      }
-      const next = Math.max(time, start + MIN_RANGE)
-      onTrimChange({ start, end: Math.min(duration, next) })
-      onSeek(Math.min(duration, next))
+      // 依存を数値のままにして、毎レンダーで購読を張り直さないようにする
+      const next = applyTrim(
+        { start, end },
+        duration,
+        target === 'start' ? { type: 'setStart', time } : { type: 'setEnd', time }
+      )
+      onTrimChange(next)
+      // 動かした側の端へ再生位置を合わせ、切り出し位置をその場で確かめられるようにする
+      onSeek(target === 'start' ? next.start : next.end)
     },
     [duration, start, end, onTrimChange, onSeek]
   )

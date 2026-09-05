@@ -1,6 +1,6 @@
 import { useCallback, useReducer, useRef } from 'react'
 import { useI18n } from '../i18n/context'
-import { encode, toConversionResult, toTrim } from '../converters'
+import { encode, toConversionResult } from '../converters'
 import {
   initialJobState,
   isJobRunning,
@@ -10,6 +10,7 @@ import {
   jobResult,
 } from '../state/conversionJob'
 import type { JobState } from '../state/conversionJob'
+import { toEncodeTrim } from '../state/trim'
 import type { ConversionResult, ConversionSettings, MediaInfo } from '../types'
 import { isAbortError } from '../utils/abort'
 import { downloadBuffer } from '../utils/download'
@@ -53,7 +54,7 @@ export function useConversionJob({
       const encoded = await encode({
         file,
         settings,
-        trim: toTrim(settings, media?.duration ?? null),
+        trim: toEncodeTrim(settings, media?.duration ?? null),
         signal: controller.signal,
         onProgress: (progress) => dispatch({ type: 'progress', value: Math.round(progress * 100) }),
       })

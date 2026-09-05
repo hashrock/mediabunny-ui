@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { RefObject } from 'react'
+import { hasReachedEnd, playbackStart } from '../state/playback'
 import type { Trim } from '../types'
 
 interface UseVideoPlaybackOptions {
@@ -30,15 +31,16 @@ export function useVideoPlayback({
   const [playing, setPlaying] = useState(false)
 
   const start = trim?.start ?? 0
-  const end = trim?.end ?? Infinity
+  // 区間が無いときは終わりも無い。数値のままにして購読の張り直しを増やさない
+  const end = trim?.end ?? null
 
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
 
     const onTimeUpdate = () => {
-      // 区間の終わりまで来たら頭に戻す（境界の揺れで抜けないよう少し手前で判定）
-      if (video.currentTime >= end - 0.02 && end !== Infinity) {
+      // 区間の終わりまで来たら頭に戻す
+      if (hasReachedEnd(video.currentTime, end)) {
         video.currentTime = start
         setCurrentTime(start)
         return
@@ -84,9 +86,8 @@ export function useVideoPlayback({
     if (!video) return
     if (video.paused) {
       // 区間の外から再生し始めると意図しない場所が流れるので頭に戻す
-      if (video.currentTime < start || video.currentTime >= end - 0.02) {
-        video.currentTime = start
-      }
+      const from = playbackStart(video.currentTime, start, end)
+      if (from !== video.currentTime) video.currentTime = from
       void video.play()
     } else {
       video.pause()

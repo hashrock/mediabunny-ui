@@ -1,3 +1,4 @@
+import { trimDuration, trimFromSettings } from '../state/trim'
 import type { ConversionSettings, MediaInfo } from '../types'
 import { DEFAULT_GIF_FPS } from './encodeGif'
 import { encodeMedia } from './encodeMedia'
@@ -21,9 +22,9 @@ export async function estimateOutputSize({
   media,
   signal,
 }: EstimateOptions): Promise<number> {
-  const start = Math.max(0, settings.startTime ?? 0)
-  const end = settings.endTime ?? media.duration
-  const duration = Math.max(0, end - start)
+  const trim = trimFromSettings(settings, media.duration)
+  const { start, end } = trim
+  const duration = trimDuration(trim)
   if (duration === 0) return 0
 
   if (settings.format === 'gif') {

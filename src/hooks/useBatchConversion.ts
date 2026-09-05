@@ -1,6 +1,6 @@
 import { useCallback, useReducer, useRef, useState } from 'react'
 import { useI18n } from '../i18n/context'
-import { encode, toConversionResult } from '../converters'
+import { encode } from '../converters'
 import { batchReducer, initialBatchState } from '../state/batchConversion'
 import type { BatchFileStatus, ConversionSettings } from '../types'
 import { isAbortError } from '../utils/abort'
@@ -71,7 +71,8 @@ export function useBatchConversion(settings: ConversionSettings): BatchConversio
               dispatch({ type: 'progress', index, value: Math.round(progress * 100) }),
           })
           await writeFileToDirectory(directory, encoded.filename, encoded.buffer)
-          dispatch({ type: 'complete', index, result: toConversionResult(item.file, encoded) })
+          // 出力は書き出し済みなので、一覧には表示に使う大きさだけを残す
+          dispatch({ type: 'complete', index, convertedSize: encoded.buffer.byteLength })
         } catch (err) {
           if (isAbortError(err)) break
           console.error('Conversion error for', item.file.name, ':', err)

@@ -64,9 +64,9 @@ export function BatchStatus({ files }: BatchStatusProps) {
               </div>
               <div style={{ color: getStatusColor(fileStatus.status), fontWeight: 'bold' }}>
                 {fileStatus.status === 'converting' && `${fileStatus.progress}%`}
-                {fileStatus.status === 'completed' && fileStatus.result && (
+                {fileStatus.status === 'completed' && (
                   <span style={{ fontSize: '12px' }}>
-                    → {formatBytes(fileStatus.result.convertedSize)}
+                    → {formatBytes(fileStatus.convertedSize)}
                   </span>
                 )}
               </div>
@@ -92,7 +92,7 @@ export function BatchStatus({ files }: BatchStatusProps) {
                 </div>
               </div>
             )}
-            {fileStatus.error && (
+            {fileStatus.status === 'error' && (
               <div style={{ marginTop: '8px', color: '#dc3545', fontSize: '12px' }}>
                 {fileStatus.error}
               </div>

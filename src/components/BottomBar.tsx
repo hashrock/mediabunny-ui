@@ -1,7 +1,9 @@
 import type { RefObject } from 'react'
 import { useVideoPlayback } from '../hooks/useVideoPlayback'
 import { useI18n } from '../i18n/context'
-import type { ConversionResult, ConversionSettings } from '../types'
+import { applyTrim, isWholeClip, trimDuration, trimFromSettings } from '../state/trim'
+import type { TrimAction } from '../state/trim'
+import type { ConversionResult, ConversionSettings, Trim } from '../types'
 import { formatBytes, formatTimecode } from '../utils/format'
 import { TimeField } from './TimeField'
 import { Timeline } from './Timeline'
@@ -44,25 +46,23 @@ export function BottomBar({
   onDownload,
 }: BottomBarProps) {
   const { t } = useI18n()
-  const start = settings.startTime ?? 0
-  const end = settings.endTime ?? duration
+  const trim = trimFromSettings(settings, duration)
+  const { start, end } = trim
   const hasTimeline = duration > 0
 
-  const playback = useVideoPlayback({
-    videoRef,
-    file,
-    trim: hasTimeline ? { start, end } : null,
-  })
+  const playback = useVideoPlayback({ videoRef, file, trim: hasTimeline ? trim : null })
 
   // 区間や再生位置をいじるのは変換前の映像に対してなので、結果を見ていたら入力側に戻す
   const showSource = () => {
     if (showAfter) onToggleView(false)
   }
 
-  const setTrim = (trim: { start: number; end: number }) => {
+  const setTrim = (next: Trim) => {
     showSource()
-    onSettingsChange({ ...settings, startTime: trim.start, endTime: trim.end })
+    onSettingsChange({ ...settings, startTime: next.start, endTime: next.end })
   }
+
+  const dispatchTrim = (action: TrimAction) => setTrim(applyTrim(trim, duration, action))
 
   const seek = (time: number) => {
     showSource()
@@ -103,15 +103,14 @@ export function BottomBar({
 
           <Timeline
             duration={duration}
-            start={start}
-            end={end}
+            trim={trim}
             currentTime={playback.currentTime}
             onTrimChange={setTrim}
             onSeek={seek}
           />
 
           <span className="trim-length" title={t.trimmedLength}>
-            {formatTimecode(Math.max(0, end - start))}
+            {formatTimecode(trimDuration(trim))}
           </span>
         </div>
       )}
@@ -122,13 +121,11 @@ export function BottomBar({
             <TimeField
               label={t.trimIn}
               value={start}
-              min={0}
-              max={Math.max(0, end - 0.1)}
-              onChange={(value) => setTrim({ start: value, end })}
+              onChange={(time) => dispatchTrim({ type: 'setStart', time })}
             />
             <button
               className="ghost-btn"
-              onClick={() => setTrim({ start: Math.min(playback.currentTime, end - 0.1), end })}
+              onClick={() => dispatchTrim({ type: 'setStart', time: playback.currentTime })}
               title={t.setInTitle}
             >
               {t.setInToPlayhead}
@@ -137,13 +134,11 @@ export function BottomBar({
             <TimeField
               label={t.trimOut}
               value={end}
-              min={Math.min(duration, start + 0.1)}
-              max={duration}
-              onChange={(value) => setTrim({ start, end: value })}
+              onChange={(time) => dispatchTrim({ type: 'setEnd', time })}
             />
             <button
               className="ghost-btn"
-              onClick={() => setTrim({ start, end: Math.max(playback.currentTime, start + 0.1) })}
+              onClick={() => dispatchTrim({ type: 'setEnd', time: playback.currentTime })}
               title={t.setOutTitle}
             >
               {t.setOutToPlayhead}
@@ -151,8 +146,8 @@ export function BottomBar({
 
             <button
               className="ghost-btn"
-              onClick={() => setTrim({ start: 0, end: duration })}
-              disabled={start === 0 && end === duration}
+              onClick={() => dispatchTrim({ type: 'wholeClip' })}
+              disabled={isWholeClip(trim, duration)}
               title={t.wholeClipTitle}
             >
               {t.wholeClip}

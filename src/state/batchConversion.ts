@@ -1,4 +1,4 @@
-import type { BatchFileStatus, ConversionResult } from '../types'
+import type { BatchFileStatus } from '../types'
 
 export type BatchState = BatchFileStatus[]
 
@@ -7,11 +7,15 @@ export type BatchAction =
   | { type: 'clear' }
   | { type: 'start'; index: number }
   | { type: 'progress'; index: number; value: number }
-  | { type: 'complete'; index: number; result: ConversionResult }
+  | { type: 'complete'; index: number; convertedSize: number }
   | { type: 'fail'; index: number; message: string }
 
 export const initialBatchState: BatchState = []
 
+/**
+ * バッチ変換の一覧。1 件ずつ差し替えるので、
+ * 前のランの結果やエラーが次の状態に紛れ込むことはない。
+ */
 export function batchReducer(state: BatchState, action: BatchAction): BatchState {
   switch (action.type) {
     case 'init':
@@ -19,25 +23,40 @@ export function batchReducer(state: BatchState, action: BatchAction): BatchState
     case 'clear':
       return initialBatchState
     case 'start':
-      return updateAt(state, action.index, { status: 'converting', progress: 0, error: undefined })
-    case 'progress':
-      return updateAt(state, action.index, { progress: action.value })
+      return replaceAt(state, action.index, ({ file }) => ({
+        file,
+        status: 'converting',
+        progress: 0,
+      }))
+    case 'progress': {
+      const item = state[action.index]
+      // 決着したあとに遅れて届いた進捗と、同じ値の繰り返しでは作り直さない
+      if (item?.status !== 'converting' || item.progress === action.value) return state
+      return replaceAt(state, action.index, () => ({ ...item, progress: action.value }))
+    }
     case 'complete':
-      return updateAt(state, action.index, {
+      return replaceAt(state, action.index, ({ file }) => ({
+        file,
         status: 'completed',
         progress: 100,
-        result: action.result,
-      })
+        convertedSize: action.convertedSize,
+      }))
     case 'fail':
-      return updateAt(state, action.index, { status: 'error', error: action.message })
+      return replaceAt(state, action.index, ({ file, progress }) => ({
+        file,
+        progress,
+        status: 'error',
+        error: action.message,
+      }))
   }
 }
 
-function updateAt(
+function replaceAt(
   state: BatchState,
   index: number,
-  patch: Partial<BatchFileStatus>
+  replace: (item: BatchFileStatus) => BatchFileStatus
 ): BatchState {
-  if (!state[index]) return state
-  return state.map((item, i) => (i === index ? { ...item, ...patch } : item))
+  const item = state[index]
+  if (!item) return state
+  return state.map((current, i) => (i === index ? replace(item) : current))
 }
