@@ -13,6 +13,7 @@ const GIF_QUALITY = 10
  * オリジン直下の '/gif.worker.js' では 404 になる。
  */
 const GIF_WORKER_SCRIPT = `${import.meta.env.BASE_URL}gif.worker.js`
+const VIDEO_LOAD_ERROR = 'Failed to load video'
 /** 全体の進捗のうちフレーム抽出が占める割合。残りは GIF のエンコードに使う */
 const FRAME_EXTRACTION_SHARE = 0.8
 
@@ -112,8 +113,24 @@ async function ensureWorkerScript(signal?: AbortSignal): Promise<void> {
   }
 }
 
+/**
+ * メタデータを待つ。ensureWorkerScript() の待ちの間に読み込みが終わることがあり、
+ * その場合 loadedmetadata は購読より前に飛んでいる。イベントだけを待つと戻ってこないので、
+ * 先に現在の状態を見る。
+ */
 function waitForMetadata(video: HTMLVideoElement, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
+    // executor の中で投げれば、そのまま reject になる
+    throwIfAborted(signal)
+    if (video.error) {
+      reject(new Error(VIDEO_LOAD_ERROR))
+      return
+    }
+    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      resolve()
+      return
+    }
+
     const cleanup = () => {
       video.onloadedmetadata = null
       video.onerror = null
@@ -130,11 +147,10 @@ function waitForMetadata(video: HTMLVideoElement, signal?: AbortSignal): Promise
     }
     video.onerror = () => {
       cleanup()
-      reject(new Error('Failed to load video'))
+      reject(new Error(VIDEO_LOAD_ERROR))
     }
 
     signal?.addEventListener('abort', onAbort, { once: true })
-    if (signal?.aborted) onAbort()
   })
 }
 
