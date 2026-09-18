@@ -9,5 +9,9 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- hashrock のサービス切り替え。ヘッダが無いので画面右上の角に浮かせる。
+         アプリは常にライト配色 (App.css) なので theme="light" で揃える -->
+    <script type="module" src="https://repos.hashrock.info/switcher/v1.js"></script>
+    <hashrock-switcher floating theme="light"></hashrock-switcher>
   </body>
 </html>
